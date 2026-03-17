@@ -1,0 +1,357 @@
+"use client";
+
+import { useState, useCallback, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { searchPublicStudents, submitPublicAttendance } from "./actions";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Loader2 } from "lucide-react";
+
+type PublicClassOption = {
+  id: string;
+  class_date: string;
+  start_time: string;
+  duration_minutes: number;
+  class_type_name: string;
+};
+
+type PublicStudentOption = { id: string; full_name: string };
+
+const STORAGE_KEY = "qr-attendance";
+
+function getStoredNames(): { full_name: string; dni: string } {
+  if (typeof window === "undefined") return { full_name: "", dni: "" };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { full_name: "", dni: "" };
+    const parsed = JSON.parse(raw) as { full_name?: string; dni?: string };
+    return {
+      full_name: typeof parsed.full_name === "string" ? parsed.full_name : "",
+      dni: typeof parsed.dni === "string" ? parsed.dni : "",
+    };
+  } catch {
+    return { full_name: "", dni: "" };
+  }
+}
+
+function setStoredNames(full_name: string, dni: string) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ full_name, dni }));
+  } catch {
+    // ignore
+  }
+}
+
+interface PublicAttendanceFormProps {
+  slug: string;
+  classes: PublicClassOption[];
+}
+
+export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProps) {
+  const [isNewStudent, setIsNewStudent] = useState(false);
+  const [classId, setClassId] = useState<string>("");
+  const [nameQuery, setNameQuery] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<PublicStudentOption | null>(null);
+  const [suggestions, setSuggestions] = useState<PublicStudentOption[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [newFullName, setNewFullName] = useState("");
+  const [newDni, setNewDni] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const s = getStoredNames();
+    if (s.full_name) setNameQuery(s.full_name);
+    setNewFullName(s.full_name);
+    setNewDni(s.dni);
+  }, []);
+
+  const fetchSuggestions = useCallback(
+    async (query: string) => {
+      if (!query || query.trim().length < 2) {
+        setSuggestions([]);
+        return;
+      }
+      setLoadingSuggestions(true);
+      try {
+        const list = await searchPublicStudents(slug, query);
+        setSuggestions(list);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    },
+    [slug]
+  );
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!nameQuery.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => fetchSuggestions(nameQuery), 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [nameQuery, fetchSuggestions]);
+
+  const hasNewStudentData =
+    isNewStudent && newFullName.trim().length > 0 && newDni.replace(/\s/g, "").length >= 7;
+  const hasChosenStudent = selectedStudent !== null || hasNewStudentData;
+  const canSubmit = Boolean(classId && hasChosenStudent);
+
+  function handleChooseRegister() {
+    setNewFullName(nameQuery.trim());
+    setSelectedStudent(null);
+    setIsNewStudent(true);
+    setSuggestions([]);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    if (!classId) {
+      setMessage({ type: "error", text: "Elegí una clase" });
+      return;
+    }
+    if (isNewStudent) {
+      if (!newFullName.trim()) {
+        setMessage({ type: "error", text: "Completá tu nombre" });
+        return;
+      }
+      if (!newDni.trim()) {
+        setMessage({ type: "error", text: "Completá tu DNI" });
+        return;
+      }
+      if (newDni.replace(/\s/g, "").length < 7) {
+        setMessage({ type: "error", text: "DNI debe tener al menos 7 caracteres" });
+        return;
+      }
+    } else {
+      if (!selectedStudent) {
+        setMessage({ type: "error", text: "Elegí tu nombre de la lista o registrate" });
+        return;
+      }
+    }
+    setSubmitting(true);
+    try {
+      const result = await submitPublicAttendance(
+        slug,
+        classId,
+        isNewStudent ? null : (selectedStudent?.id ?? null),
+        isNewStudent
+          ? {
+              full_name: newFullName.trim(),
+              dni: newDni.trim().replace(/\s/g, ""),
+              email: newEmail.trim() || null,
+              phone: newPhone.trim() || null,
+            }
+          : null
+      );
+      if (result.ok) {
+        setMessage({ type: "success", text: "Asistencia registrada." });
+        setClassId("");
+        if (isNewStudent) {
+          setStoredNames(newFullName.trim(), newDni.trim().replace(/\s/g, ""));
+          setIsNewStudent(false);
+          setNewEmail("");
+          setNewPhone("");
+        }
+        setNameQuery("");
+        setSelectedStudent(null);
+        setSuggestions([]);
+      } else {
+        setMessage({ type: "error", text: result.error });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Error al enviar. Intentá de nuevo." });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (classes.length === 0) {
+    return (
+      <p className="mt-6 text-sm text-muted-foreground">
+        No hay clases en las próximas 24 horas para registrar asistencia.
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="class-select">Clase</Label>
+        <Select value={classId} onValueChange={setClassId}>
+          <SelectTrigger id="class-select">
+            <SelectValue placeholder="Seleccionar clase" />
+          </SelectTrigger>
+          <SelectContent>
+            {classes.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.class_type_name} — {format(new Date(c.class_date), "EEE d MMM", { locale: es })}{" "}
+                {String(c.start_time).slice(0, 5)} ({c.duration_minutes} min)
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-3">
+        {!isNewStudent ? (
+          <div className="space-y-2">
+            <Label htmlFor="name-input">Tu nombre</Label>
+            <div className="relative">
+              <Input
+                id="name-input"
+                type="text"
+                placeholder="Escribí para buscar"
+                value={nameQuery}
+                onChange={(e) => {
+                  setNameQuery(e.target.value);
+                  setSelectedStudent(null);
+                }}
+                autoComplete="off"
+                className="pr-8"
+              />
+              {loadingSuggestions && (
+                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+              )}
+              {!selectedStudent &&
+                (suggestions.length > 0 ||
+                  (nameQuery.trim().length > 4 && !loadingSuggestions)) && (
+                  <ul
+                    className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-background py-1 text-sm shadow-md"
+                    role="listbox"
+                  >
+                    {suggestions.map((s) => (
+                      <li
+                        key={s.id}
+                        role="option"
+                        aria-selected={false}
+                        className="cursor-pointer px-3 py-2 hover:bg-accent"
+                        onMouseDown={() => {
+                          setSelectedStudent(s);
+                          setNameQuery(s.full_name);
+                          setSuggestions([]);
+                        }}
+                      >
+                        <span className="capitalize">{s.full_name}</span>
+                      </li>
+                    ))}
+                    {nameQuery.trim().length > 4 &&
+                      !loadingSuggestions &&
+                      suggestions.length === 0 && (
+                        <li
+                          role="option"
+                          aria-selected={false}
+                          className="cursor-pointer border-t border-border px-3 py-2 font-medium text-primary hover:bg-accent"
+                          onMouseDown={handleChooseRegister}
+                        >
+                          Registrate
+                        </li>
+                      )}
+                  </ul>
+                )}
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 rounded-md border border-border/80 bg-muted/30 p-3">
+            <p className="text-[13px] font-medium text-muted-foreground">
+              Completá tus datos para registrarte (el profesor te confirmará después).
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsNewStudent(false)}
+              className="text-[13px] text-primary underline hover:no-underline"
+            >
+              Buscar de nuevo en la lista
+            </button>
+            <div className="space-y-2">
+              <Label htmlFor="new-fullname">Nombre completo</Label>
+              <Input
+                id="new-fullname"
+                type="text"
+                placeholder="Ej. Juan Pérez"
+                value={newFullName}
+                onChange={(e) => setNewFullName(e.target.value)}
+                autoComplete="name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-dni">DNI</Label>
+              <Input
+                id="new-dni"
+                type="text"
+                inputMode="numeric"
+                placeholder="Ej. 12345678"
+                value={newDni}
+                onChange={(e) => setNewDni(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-email">Email (opcional)</Label>
+              <Input
+                id="new-email"
+                type="email"
+                placeholder="ejemplo@mail.com"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                autoComplete="email"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-phone">Teléfono (opcional)</Label>
+              <Input
+                id="new-phone"
+                type="tel"
+                placeholder="Ej. 11 1234-5678"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                autoComplete="tel"
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {message && (
+        <p
+          className={
+            message.type === "error"
+              ? "text-sm text-destructive"
+              : "text-sm text-emerald-500 dark:text-emerald-400"
+          }
+        >
+          {message.text}
+        </p>
+      )}
+
+      <Button type="submit" disabled={submitting || !canSubmit}>
+        {submitting ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Enviando…
+          </>
+        ) : (
+          "Registrar asistencia"
+        )}
+      </Button>
+    </form>
+  );
+}
