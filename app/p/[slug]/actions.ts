@@ -213,10 +213,21 @@ export async function submitPublicAttendance(
     };
   }
 
+  // IMPORTANTE: usamos upsert con ignoreDuplicates para NO requerir UPDATE en caso de conflicto.
   const { error: attErr } = await supabase
     .from("class_attendances")
-    .upsert({ class_id: classId, student_id: sid }, { onConflict: "class_id,student_id" });
-  if (attErr) return { ok: false, error: "No se pudo registrar la asistencia" };
+    .upsert({ class_id: classId, student_id: sid }, { onConflict: "class_id,student_id", ignoreDuplicates: true });
+  if (attErr) {
+    const msg = attErr.message ?? "";
+    return {
+      ok: false,
+      error: msg.includes("violates row-level security policy")
+        ? "No autorizado para registrar asistencia (permisos de base de datos)."
+        : msg.includes("duplicate key")
+          ? "Asistencia ya registrada."
+          : "No se pudo registrar la asistencia",
+    };
+  }
 
   return { ok: true, studentId: sid };
 }
