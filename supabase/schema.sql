@@ -291,53 +291,6 @@ BEGIN
 END;
 $$;
 
--- Registro público (QR): crea/obtiene alumno por slug (evita depender de RLS en prod)
-CREATE OR REPLACE FUNCTION public.public_register_student_for_slug(
-  p_slug TEXT,
-  p_full_name TEXT,
-  p_dni TEXT,
-  p_email TEXT DEFAULT NULL,
-  p_phone TEXT DEFAULT NULL
-)
-RETURNS UUID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public AS $$
-DECLARE
-  v_teacher_id UUID;
-  v_existing UUID;
-  v_new UUID;
-BEGIN
-  SELECT t.id INTO v_teacher_id
-  FROM teachers t
-  WHERE t.public_slug = p_slug
-    AND t.public_slug IS NOT NULL
-    AND t.public_slug <> ''
-  LIMIT 1;
-
-  IF v_teacher_id IS NULL THEN
-    RAISE EXCEPTION 'Invalid slug';
-  END IF;
-
-  SELECT s.id INTO v_existing
-  FROM students s
-  WHERE s.teacher_id = v_teacher_id
-    AND s.dni = p_dni
-    AND s.deleted_at IS NULL
-  LIMIT 1;
-
-  IF v_existing IS NOT NULL THEN
-    RETURN v_existing;
-  END IF;
-
-  INSERT INTO students (teacher_id, full_name, dni, email, phone, status)
-  VALUES (v_teacher_id, p_full_name, p_dni, NULLIF(btrim(p_email), ''), NULLIF(btrim(p_phone), ''), 'to_confirm')
-  RETURNING id INTO v_new;
-
-  RETURN v_new;
-END;
-$$;
-
 -- Triggers updated_at
 CREATE TRIGGER set_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER set_teachers_updated_at BEFORE UPDATE ON public.teachers FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();

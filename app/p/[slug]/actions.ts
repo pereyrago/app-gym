@@ -175,55 +175,36 @@ export async function submitPublicAttendance(
     const dni = newStudentData.dni.trim().replace(/\s/g, "");
     if (dni.length < 7 || dni.length > 12)
       return { ok: false, error: "DNI inválido (entre 7 y 12 caracteres)." };
-    // Primero intentamos la RPC (si existe en prod) para evitar problemas de RLS.
-    const { data: createdId, error: rpcErr } = await supabase.rpc(
-      "public_register_student_for_slug",
-      {
-        p_slug: slug,
-        p_full_name: name,
-        p_dni: dni,
-        p_email: newStudentData.email?.trim() || null,
-        p_phone: newStudentData.phone?.trim() || null,
-      }
-    );
-    if (!rpcErr && createdId) {
-      sid = String(createdId);
+    const { data: existing } = await supabase
+      .from("students")
+      .select("id")
+      .eq("teacher_id", teacher.id)
+      .eq("dni", dni)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (existing) {
+      sid = (existing as { id: string }).id;
     } else {
-      const { data: existing } = await supabase
+      const { data: newStudent, error: insertErr } = await supabase
         .from("students")
+        .insert({
+          teacher_id: teacher.id,
+          full_name: name,
+          dni,
+          email: newStudentData.email?.trim() || null,
+          phone: newStudentData.phone?.trim() || null,
+          status: AUTO_APPROVE_QR ? "active" : "to_confirm",
+        } as never)
         .select("id")
-        .eq("teacher_id", teacher.id)
-        .eq("dni", dni)
-        .is("deleted_at", null)
-        .maybeSingle();
-      if (existing) {
-        sid = (existing as { id: string }).id;
-      } else {
-        const { data: newStudent, error: insertErr } = await supabase
-          .from("students")
-          .insert({
-            teacher_id: teacher.id,
-            full_name: name,
-            dni,
-            email: newStudentData.email?.trim() || null,
-            phone: newStudentData.phone?.trim() || null,
-            status: AUTO_APPROVE_QR ? "active" : "to_confirm",
-          } as never)
-          .select("id")
-          .single();
-        if (insertErr) {
-          const msg = insertErr.message ?? "";
-          return {
-            ok: false,
-            error: msg.includes("unique") || msg.includes("duplicate key")
-              ? "Ya existe un alumno con ese DNI."
-              : msg.includes("violates row-level security policy")
-                ? "No autorizado para crear alumno (permisos de base de datos)."
-                : `No se pudo registrar. Intenta de nuevo. (${insertErr.code ?? "err"})`,
-          };
-        }
-        sid = (newStudent as { id: string }).id;
-      }
+        .single();
+      if (insertErr)
+        return {
+          ok: false,
+          error: insertErr.message.includes("unique")
+            ? "Ya existe un alumno con ese DNI."
+            : "No se pudo registrar. Intenta de nuevo.",
+        };
+      sid = (newStudent as { id: string }).id;
     }
   } else {
     return {
@@ -232,21 +213,10 @@ export async function submitPublicAttendance(
     };
   }
 
-  // IMPORTANTE: usamos upsert con ignoreDuplicates para NO requerir UPDATE en caso de conflicto.
   const { error: attErr } = await supabase
     .from("class_attendances")
-    .upsert({ class_id: classId, student_id: sid }, { onConflict: "class_id,student_id", ignoreDuplicates: true });
-  if (attErr) {
-    const msg = attErr.message ?? "";
-    return {
-      ok: false,
-      error: msg.includes("violates row-level security policy")
-        ? "No autorizado para registrar asistencia (permisos de base de datos)."
-        : msg.includes("duplicate key")
-          ? "Asistencia ya registrada."
-          : "No se pudo registrar la asistencia",
-    };
-  }
+    .upsert({ class_id: classId, student_id: sid }, { onConflict: "class_id,student_id" });
+  if (attErr) return { ok: false, error: "No se pudo registrar la asistencia" };
 
   return { ok: true, studentId: sid };
 }
