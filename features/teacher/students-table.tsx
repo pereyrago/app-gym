@@ -108,7 +108,6 @@ export function StudentsTable({
   const router = useRouter();
   const pathname = usePathname();
   const [searchInput, setSearchInput] = useState(searchFromUrl);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     setSearchInput(searchFromUrl);
@@ -229,13 +228,13 @@ export function StudentsTable({
                   <TableRow
                     key={s.id}
                     className="cursor-pointer"
-                    onClick={() => setSelectedStudent(s)}
+                    onClick={() => router.push(`/teacher/students/${s.id}`)}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        setSelectedStudent(s);
+                        router.push(`/teacher/students/${s.id}`);
                       }
                     }}
                   >
@@ -263,58 +262,6 @@ export function StudentsTable({
           </p>
         )}
       </div>
-
-      <Dialog open={!!selectedStudent} onOpenChange={(open) => !open && setSelectedStudent(null)}>
-        <DialogContent className="max-w-sm gap-4 p-5 sm:max-w-sm">
-          {selectedStudent && (
-            <>
-              <DialogHeader className="space-y-1">
-                <DialogTitle className="text-base capitalize">
-                  {selectedStudent.full_name}
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <p className="text-[12px] font-medium text-muted-foreground">DNI</p>
-                  <p className="font-mono text-sm">{selectedStudent.dni ?? "—"}</p>
-                </div>
-                <div>
-                  <p className="text-[12px] font-medium text-muted-foreground">Email</p>
-                  <p className="text-sm">{selectedStudent.email ?? "—"}</p>
-                </div>
-                <PhoneRow label="Teléfono" value={selectedStudent.phone} />
-                <PhoneRow
-                  label="Teléfono de emergencia"
-                  value={selectedStudent.emergency_contact_phone}
-                />
-                <div>
-                  <p className="text-[12px] font-medium text-muted-foreground">Apto físico</p>
-                  <p className="text-sm">
-                    {selectedStudent.apto_fisico === true
-                      ? "Sí"
-                      : selectedStudent.apto_fisico === false
-                        ? "No"
-                        : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[12px] font-medium text-muted-foreground">Estado</p>
-                  <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    {selectedStudent.status === "to_confirm" ? (
-                      <>
-                        <Info className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                        Pendiente
-                      </>
-                    ) : (
-                      "Activo"
-                    )}
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

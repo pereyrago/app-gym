@@ -20,6 +20,9 @@ type TeacherPdfOptions = {
   group3StudentMultiplier?: number; // para 3 o más alumnos (ej: 0.5)
 };
 
+const LOGO_RATIO_W = 404;
+const LOGO_RATIO_H = 380;
+
 async function svgUrlToPngDataUrl(svgUrl: string, targetWidthPx = 600): Promise<string> {
   const svgText = await fetch(svgUrl).then((r) => {
     if (!r.ok) throw new Error(`No se pudo cargar el logo (${r.status})`);
@@ -37,9 +40,8 @@ async function svgUrlToPngDataUrl(svgUrl: string, targetWidthPx = 600): Promise<
       i.src = svgObjectUrl;
     });
 
-    const ratio = img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : 3;
     const w = Math.max(1, Math.floor(targetWidthPx));
-    const h = Math.max(1, Math.floor(w / ratio));
+    const h = Math.max(1, Math.floor((w * LOGO_RATIO_H) / LOGO_RATIO_W));
 
     const canvas = document.createElement("canvas");
     canvas.width = w;
@@ -47,7 +49,14 @@ async function svgUrlToPngDataUrl(svgUrl: string, targetWidthPx = 600): Promise<
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo inicializar canvas");
     ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(img, 0, 0, w, h);
+
+    // Dibuja centrado respetando el ratio 404x380 (sin estirar)
+    const scale = Math.min(w / (img.naturalWidth || w), h / (img.naturalHeight || h));
+    const dw = (img.naturalWidth || w) * scale;
+    const dh = (img.naturalHeight || h) * scale;
+    const dx = (w - dw) / 2;
+    const dy = (h - dh) / 2;
+    ctx.drawImage(img, dx, dy, dw, dh);
 
     return canvas.toDataURL("image/png");
   } finally {
@@ -76,67 +85,136 @@ export async function generateTeacherPdf(
   // Header
   let y = marginTop;
   const logoPng = await svgUrlToPngDataUrl("/full_logo.svg");
-  const logoW = 38;
-  const logoH = 14;
+  const logoW = 22;
+  const logoH = (logoW * LOGO_RATIO_H) / LOGO_RATIO_W;
   doc.addImage(logoPng, "PNG", marginLeft, marginTop, logoW, logoH);
 
-  const headerY = marginTop + 9;
+  const headerY = marginTop + 7.5;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.text("Salud y Rendimiento", marginLeft + logoW + 6, headerY);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(`Period: ${data.periodName}`, pageWidth - marginRight, headerY, { align: "right" });
+  doc.text(
+    "Resumen de clases durante el periodo",
+    marginLeft + logoW + 6,
+    headerY + 6
+  );
 
-  y = marginTop + logoH + 12;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Periodo: ${data.periodName}`, pageWidth - marginRight, headerY, { align: "right" });
+
+  y = marginTop + logoH + 14;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.text(data.teacherName, marginLeft, y);
   y += 10;
 
-  // Summary table (por cantidad de alumnos)
-  const counts = { one: 0, two: 0, threePlus: 0 };
-  for (const c of data.classes) {
-    if (c.attendancesCount <= 1) counts.one += 1;
-    else if (c.attendancesCount === 2) counts.two += 1;
-    else counts.threePlus += 1;
+  function countBy(duration: 60 | 90) {
+    const counts = { one: 0, two: 0, threePlus: 0 };
+    for (const c of data.classes) {
+      const dur = (c.duration_minutes ?? 60) === 90 ? 90 : 60;
+      if (dur !== duration) continue;
+      if (c.attendancesCount <= 1) counts.one += 1;
+      else if (c.attendancesCount === 2) counts.two += 1;
+      else counts.threePlus += 1;
+    }
+    return counts;
   }
 
-  const rows = [
-    {
+  const has90 = data.classes.some((c) => (c.duration_minutes ?? 60) === 90);
+
+  const rows: Array<{
+    label: string;
+    qty: number;
+    students: number;
+    multiplier: number;
+    total: number;
+  }> = [];
+
+  const counts60 = countBy(60);
+  if (counts60.one > 0) {
+    rows.push({
       label: "Clases individuales x 60min",
-      qty: counts.one,
+      qty: counts60.one,
       students: 1,
-      total: counts.one * 1 * 1,
-    },
-    {
+      multiplier: 1,
+      total: counts60.one * 1 * 1,
+    });
+  }
+  if (counts60.two > 0) {
+    rows.push({
       label: "Clases grupales (2) x 60min",
-      qty: counts.two,
+      qty: counts60.two,
       students: 2,
-      total: counts.two * 2 * group2StudentMultiplier,
-    },
-    {
+      multiplier: group2StudentMultiplier,
+      total: counts60.two * 2 * group2StudentMultiplier,
+    });
+  }
+  if (counts60.threePlus > 0) {
+    rows.push({
       label: "Clases grupales (3) x 60min",
-      qty: counts.threePlus,
+      qty: counts60.threePlus,
       students: 3,
-      total: counts.threePlus * 3 * group3StudentMultiplier,
-    },
-  ];
+      multiplier: group3StudentMultiplier,
+      total: counts60.threePlus * 3 * group3StudentMultiplier,
+    });
+  }
+
+  if (has90) {
+    const counts90 = countBy(90);
+    if (counts90.one > 0) {
+      rows.push({
+        label: "Clases individuales x 90min",
+        qty: counts90.one,
+        students: 1,
+        multiplier: 1,
+        total: counts90.one * 1 * 1,
+      });
+    }
+    if (counts90.two > 0) {
+      rows.push({
+        label: "Clases grupales (2) x 90min",
+        qty: counts90.two,
+        students: 2,
+        multiplier: group2StudentMultiplier,
+        total: counts90.two * 2 * group2StudentMultiplier,
+      });
+    }
+    if (counts90.threePlus > 0) {
+      rows.push({
+        label: "Clases grupales (3) x 90min",
+        qty: counts90.threePlus,
+        students: 3,
+        multiplier: group3StudentMultiplier,
+        total: counts90.threePlus * 3 * group3StudentMultiplier,
+      });
+    }
+  }
 
   doc.setFontSize(10);
   const tableX = marginLeft;
   const tableW = pageWidth - marginLeft - marginRight;
   const col1 = tableX;
-  const col2 = tableX + tableW * 0.58;
-  const col3 = tableX + tableW * 0.74;
-  const col4 = tableX + tableW * 0.86;
+  const col2 = tableX + tableW * 0.52;
+  const col3 = tableX + tableW * 0.67;
+  const col4 = tableX + tableW * 0.79;
+  const col5 = tableX + tableW * 0.90;
   const rowH = 8;
 
   doc.setFont("helvetica", "bold");
   doc.text("Resumen", tableX, y);
   y += 6;
+
+  if (rows.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.text("Sin clases registradas para el período.", tableX, y);
+    const blob = doc.output("blob");
+    return URL.createObjectURL(blob);
+  }
 
   // Header row
   doc.setDrawColor(180);
@@ -144,7 +222,8 @@ export async function generateTeacherPdf(
   doc.text("Clase", col1 + 2, y + 5.5);
   doc.text("Cantidad", col2 + 2, y + 5.5);
   doc.text("Alumnos", col3 + 2, y + 5.5);
-  doc.text("Total", col4 + 2, y + 5.5);
+  doc.text("Multiplicador", col4 + 2, y + 5.5);
+  doc.text("Total", col5 + 2, y + 5.5);
   y += rowH;
 
   doc.setFont("helvetica", "normal");
@@ -153,7 +232,8 @@ export async function generateTeacherPdf(
     doc.text(r.label, col1 + 2, y + 5.5);
     doc.text(String(r.qty), col2 + 2, y + 5.5);
     doc.text(String(r.students), col3 + 2, y + 5.5);
-    doc.text(formatNumber(r.total), col4 + 2, y + 5.5);
+    doc.text(formatNumber(r.multiplier), col4 + 2, y + 5.5);
+    doc.text(formatNumber(r.total), col5 + 2, y + 5.5);
     y += rowH;
   }
 

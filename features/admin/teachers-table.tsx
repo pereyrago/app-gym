@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -30,6 +31,7 @@ interface TeachersTableProps {
 
 export function TeachersTable({ teachers }: TeachersTableProps) {
   const [resetPasswordTeacher, setResetPasswordTeacher] = useState<TeacherWithProfile | null>(null);
+  const router = useRouter();
 
   if (teachers.length === 0) {
     return (
@@ -57,7 +59,19 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
             const fullName = profile?.full_name ?? "—";
             const role = profile?.role ?? "profesor";
             return (
-              <TableRow key={teacher.id}>
+              <TableRow
+                key={teacher.id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/admin/teachers/${teacher.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(`/admin/teachers/${teacher.id}`);
+                  }
+                }}
+              >
                 <TableCell className="font-medium capitalize">{fullName}</TableCell>
                 <TableCell>{email}</TableCell>
                 <TableCell>
@@ -71,11 +85,12 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
                         size="icon"
                         className="h-8 w-8 rounded"
                         aria-label="Abrir menú"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <MoreHorizontal className="h-3.5 w-3.5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                       <DropdownMenuItem asChild>
                         <Link href={`/admin/teachers/${teacher.id}`}>
                           <Eye className="mr-2 h-4 w-4" />
