@@ -5,8 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ClassStatusBlock } from "@/features/teacher/class-status-block";
 import { ClassAttendancesForm } from "@/features/teacher/class-attendances-form";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatClassDate } from "@/lib/app-timezone";
 import type { ClassStatus } from "@/types/database.types";
 import type { Student } from "@/types";
 import type { AbsenceDetail } from "@/repositories/attendances";
@@ -70,7 +69,7 @@ export function TeacherClassDetailCard({
           />
         </div>
         <CardContent className="pt-0 text-muted-foreground">
-          {format(new Date(classDate), "EEEE d MMMM", { locale: es })}
+          {formatClassDate(classDate, "EEEE d MMMM")}
           {startTime != null && (
             <>
               {" "}

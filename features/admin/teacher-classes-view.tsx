@@ -21,8 +21,7 @@ import { Button } from "@/components/ui/button";
 import { classCanBeEdited } from "@/lib/class-utils";
 import type { Period } from "@/types";
 import type { ClassWithType } from "@/types";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatClassDate } from "@/lib/app-timezone";
 
 interface TeacherClassesViewProps {
   teacherId: string;
@@ -100,7 +99,7 @@ export function TeacherClassesView({
               );
               return (
                 <TableRow key={c.id}>
-                  <TableCell>{format(new Date(c.class_date), "d MMM", { locale: es })}</TableCell>
+                  <TableCell>{formatClassDate(c.class_date)}</TableCell>
                   <TableCell className="font-medium capitalize">
                     {c.class_types?.name ?? "—"}
                   </TableCell>

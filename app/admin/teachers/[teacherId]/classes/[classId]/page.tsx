@@ -13,8 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChevronLeft } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatClassDate } from "@/lib/app-timezone";
 
 interface PageProps {
   params: Promise<{ teacherId: string; classId: string }>;
@@ -70,7 +69,7 @@ export default async function AdminClassAttendancesPage({ params }: PageProps) {
         <CardHeader>
           <CardTitle>{classData.class_types?.name ?? "Clase"}</CardTitle>
           <CardContent className="pt-0 text-muted-foreground">
-            {format(new Date(classData.class_date), "EEEE d MMMM", { locale: es })}
+            {formatClassDate(classData.class_date, "EEEE d MMMM")}
             {classData.start_time != null && (
               <>
                 {" "}

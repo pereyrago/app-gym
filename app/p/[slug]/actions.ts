@@ -86,8 +86,22 @@ export async function searchPublicStudents(
     p_sort_order: "asc",
     p_limit: 15,
   });
-  if (error) return [];
-  return ((data ?? []) as Array<{ id: string; full_name: string }>).map((s) => ({
+  if (!error && data != null) {
+    return ((data as Array<{ id: string; full_name: string }>) ?? []).map((s) => ({
+      id: s.id,
+      full_name: s.full_name,
+    }));
+  }
+  // Fallback si la RPC no existe o falla (ej. BD sin student_shares): búsqueda directa por teacher_id (RLS permite anon para profes con slug)
+  const { data: fallback } = await supabase
+    .from("students")
+    .select("id, full_name")
+    .eq("teacher_id", teacherId)
+    .is("deleted_at", null)
+    .ilike("full_name", `%${query.trim()}%`)
+    .order("full_name", { ascending: true })
+    .limit(15);
+  return ((fallback ?? []) as Array<{ id: string; full_name: string }>).map((s) => ({
     id: s.id,
     full_name: s.full_name,
   }));

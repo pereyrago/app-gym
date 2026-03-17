@@ -12,8 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { searchPublicStudents, submitPublicAttendance } from "./actions";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatClassDate } from "@/lib/app-timezone";
 import { Loader2 } from "lucide-react";
 
 type PublicClassOption = {
@@ -203,7 +202,7 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
           <SelectContent>
             {classes.map((c) => (
               <SelectItem key={c.id} value={c.id}>
-                {c.class_type_name} — {format(new Date(c.class_date), "EEE d MMM", { locale: es })}{" "}
+                {c.class_type_name} — {formatClassDate(c.class_date, "EEE d MMM")}{" "}
                 {String(c.start_time).slice(0, 5)} ({c.duration_minutes} min)
               </SelectItem>
             ))}
@@ -233,7 +232,7 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
               )}
               {!selectedStudent &&
                 (suggestions.length > 0 ||
-                  (nameQuery.trim().length > 4 && !loadingSuggestions)) && (
+                  (nameQuery.trim().length >= 2 && !loadingSuggestions)) && (
                   <ul
                     className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-background py-1 text-sm shadow-md"
                     role="listbox"
@@ -253,7 +252,7 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
                         <span className="capitalize">{s.full_name}</span>
                       </li>
                     ))}
-                    {nameQuery.trim().length > 4 &&
+                    {nameQuery.trim().length >= 2 &&
                       !loadingSuggestions &&
                       suggestions.length === 0 && (
                         <li
@@ -262,7 +261,7 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
                           className="cursor-pointer border-t border-border px-3 py-2 font-medium text-primary hover:bg-accent"
                           onMouseDown={handleChooseRegister}
                         >
-                          Registrate
+                          No estoy en la lista — Registrate
                         </li>
                       )}
                   </ul>

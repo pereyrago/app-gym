@@ -1,6 +1,5 @@
 import { jsPDF } from "jspdf";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatClassDate } from "@/lib/app-timezone";
 
 export interface TeacherReportRow {
   teacherName: string;
@@ -278,7 +277,7 @@ export function generateAllTeachersPdf(data: AllTeachersReportRow[]): string {
     y += 8;
     for (const c of teacher.classes) {
       doc.text(
-        `  ${format(new Date(c.class_date), "d MMM yyyy", { locale: es })} - ${c.classTypeName} (${c.attendancesCount} asistentes)`,
+        `  ${formatClassDate(c.class_date, "d MMM yyyy")} - ${c.classTypeName} (${c.attendancesCount} asistentes)`,
         14,
         y
       );

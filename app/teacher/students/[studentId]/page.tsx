@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { createClient } from "@/lib/supabase/server";
+import { formatClassDate } from "@/lib/app-timezone";
 import { getProfile } from "@/lib/auth";
 import { getMyTeacherId } from "@/lib/teacher";
 import { ChevronLeft } from "lucide-react";
@@ -170,7 +169,7 @@ export default async function TeacherStudentHistoryPage({ params }: PageProps) {
             return (
               <TableRow key={c.id}>
                 <TableCell>
-                  {format(new Date(c.class_date), "d MMM yyyy", { locale: es })}
+                  {formatClassDate(c.class_date, "d MMM yyyy")}
                 </TableCell>
                 <TableCell className="font-mono text-[13px]">
                   {String(c.start_time).slice(0, 5)}

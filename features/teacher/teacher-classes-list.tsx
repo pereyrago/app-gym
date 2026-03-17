@@ -19,10 +19,9 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { classCanBeEdited } from "@/lib/class-utils";
+import { formatClassDate } from "@/lib/app-timezone";
 import type { Period } from "@/types";
 import type { ClassWithType } from "@/types";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 
 interface TeacherClassesListProps {
   teacherId: string;
@@ -123,7 +122,7 @@ export function TeacherClassesList({
                   : "w-full transition-colors duration-200 ease-in-out";
               return (
                 <TableRow key={c.id}>
-                  <TableCell>{format(new Date(c.class_date), "d MMM", { locale: es })}</TableCell>
+                  <TableCell>{formatClassDate(c.class_date)}</TableCell>
                   <TableCell className="font-medium capitalize">
                     {c.class_types?.name ?? "—"}
                   </TableCell>
