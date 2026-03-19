@@ -117,9 +117,13 @@ CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql
 AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
 
-CREATE OR REPLACE FUNCTION public.class_can_edit(class_created_at TIMESTAMPTZ)
+DROP FUNCTION IF EXISTS public.class_can_edit(TIMESTAMPTZ);
+-- Misma regla que schema.sql: editable hasta 24h después del inicio programado (no desde created_at)
+CREATE OR REPLACE FUNCTION public.class_can_edit(p_class_date DATE, p_start_time TIME)
 RETURNS boolean LANGUAGE sql STABLE
-AS $$ SELECT (now() - class_created_at) <= interval '24 hours'; $$;
+AS $$
+  SELECT now() <= ((p_class_date + p_start_time) AT TIME ZONE 'America/Argentina/Buenos_Aires') + interval '24 hours';
+$$;
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
@@ -182,12 +186,12 @@ DROP POLICY IF EXISTS "Admins can delete classes within 24h" ON public.classes;
 
 CREATE POLICY "Teachers can select own classes" ON public.classes FOR SELECT USING (teacher_id = public.get_my_teacher_id());
 CREATE POLICY "Teachers can insert own classes" ON public.classes FOR INSERT WITH CHECK (teacher_id = public.get_my_teacher_id());
-CREATE POLICY "Teachers can update own classes within 24h" ON public.classes FOR UPDATE USING (teacher_id = public.get_my_teacher_id() AND public.class_can_edit(created_at)) WITH CHECK (teacher_id = public.get_my_teacher_id());
-CREATE POLICY "Teachers can delete own classes within 24h" ON public.classes FOR DELETE USING (teacher_id = public.get_my_teacher_id() AND public.class_can_edit(created_at));
+CREATE POLICY "Teachers can update own classes within 24h" ON public.classes FOR UPDATE USING (teacher_id = public.get_my_teacher_id() AND public.class_can_edit(class_date, start_time)) WITH CHECK (teacher_id = public.get_my_teacher_id());
+CREATE POLICY "Teachers can delete own classes within 24h" ON public.classes FOR DELETE USING (teacher_id = public.get_my_teacher_id() AND public.class_can_edit(class_date, start_time));
 CREATE POLICY "Admins can view all classes" ON public.classes FOR SELECT USING (public.is_admin());
 CREATE POLICY "Admins can insert classes for any teacher" ON public.classes FOR INSERT WITH CHECK (public.is_admin());
-CREATE POLICY "Admins can update classes within 24h" ON public.classes FOR UPDATE USING (public.is_admin() AND public.class_can_edit(created_at)) WITH CHECK (public.is_admin());
-CREATE POLICY "Admins can delete classes within 24h" ON public.classes FOR DELETE USING (public.is_admin() AND public.class_can_edit(created_at));
+CREATE POLICY "Admins can update classes within 24h" ON public.classes FOR UPDATE USING (public.is_admin() AND public.class_can_edit(class_date, start_time)) WITH CHECK (public.is_admin());
+CREATE POLICY "Admins can delete classes within 24h" ON public.classes FOR DELETE USING (public.is_admin() AND public.class_can_edit(class_date, start_time));
 
 DROP POLICY IF EXISTS "Teachers can manage attendances for own classes" ON public.class_attendances;
 CREATE POLICY "Teachers can manage attendances for own classes" ON public.class_attendances FOR ALL

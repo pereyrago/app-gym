@@ -1,19 +1,13 @@
-import { parseClassDateTimeInAppTz } from "@/lib/app-timezone";
+import { isClassEditableAt } from "@/lib/class-schedule-rules";
+
+export { CLASS_EDIT_WINDOW_MS } from "@/lib/class-schedule-rules";
 
 /**
- * Regla de negocio: la clase se puede editar desde que se crea hasta 24 horas
- * después de la hora de inicio de la misma. Coincide con RLS en el servidor.
+ * Indica si una clase puede editarse: hasta 24h después del instante de inicio programado.
+ * Coincide con `public.class_can_edit(class_date, start_time)` en el servidor.
  */
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-
-/** Indica si una clase puede editarse (hasta 24h después de su hora de inicio). */
 export function classCanBeEdited(classDate: string, startTime: string): boolean {
-  const classStart = parseClassDateTimeInAppTz(
-    classDate,
-    String(startTime ?? "09:00").slice(0, 5)
-  ).getTime();
-  const now = Date.now();
-  return now <= classStart + TWENTY_FOUR_HOURS_MS;
+  return isClassEditableAt(classDate, startTime, Date.now());
 }
 
 export function getClassEditableMessage(classDate: string, startTime: string): string {

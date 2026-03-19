@@ -27,24 +27,25 @@ type PublicStudentOption = { id: string; full_name: string };
 
 const STORAGE_KEY = "qr-attendance";
 
-function getStoredNames(): { full_name: string; dni: string } {
-  if (typeof window === "undefined") return { full_name: "", dni: "" };
+function getStoredNames(): { full_name: string; dni: string; phone: string } {
+  if (typeof window === "undefined") return { full_name: "", dni: "", phone: "" };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { full_name: "", dni: "" };
-    const parsed = JSON.parse(raw) as { full_name?: string; dni?: string };
+    if (!raw) return { full_name: "", dni: "", phone: "" };
+    const parsed = JSON.parse(raw) as { full_name?: string; dni?: string; phone?: string };
     return {
       full_name: typeof parsed.full_name === "string" ? parsed.full_name : "",
       dni: typeof parsed.dni === "string" ? parsed.dni : "",
+      phone: typeof parsed.phone === "string" ? parsed.phone : "",
     };
   } catch {
-    return { full_name: "", dni: "" };
+    return { full_name: "", dni: "", phone: "" };
   }
 }
 
-function setStoredNames(full_name: string, dni: string) {
+function setStoredNames(full_name: string, dni: string, phone: string) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ full_name, dni }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ full_name, dni, phone }));
   } catch {
     // ignore
   }
@@ -75,6 +76,7 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
     if (s.full_name) setNameQuery(s.full_name);
     setNewFullName(s.full_name);
     setNewDni(s.dni);
+    setNewPhone(s.phone);
   }, []);
 
   const fetchSuggestions = useCallback(
@@ -109,7 +111,7 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
   }, [nameQuery, fetchSuggestions]);
 
   const hasNewStudentData =
-    isNewStudent && newFullName.trim().length > 0 && newDni.replace(/\s/g, "").length >= 7;
+    isNewStudent && newFullName.trim().length > 0 && newPhone.trim().length > 0;
   const hasChosenStudent = selectedStudent !== null || hasNewStudentData;
   const canSubmit = Boolean(classId && hasChosenStudent);
 
@@ -127,19 +129,33 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
       setMessage({ type: "error", text: "Elegí una clase" });
       return;
     }
+    let newStudentPayload: {
+      full_name: string;
+      dni?: string;
+      email: string | null;
+      phone: string;
+    } | null = null;
+
     if (isNewStudent) {
       if (!newFullName.trim()) {
         setMessage({ type: "error", text: "Completá tu nombre" });
         return;
       }
-      if (!newDni.trim()) {
-        setMessage({ type: "error", text: "Completá tu DNI" });
+      if (!newPhone.trim()) {
+        setMessage({ type: "error", text: "Completá tu teléfono" });
         return;
       }
-      if (newDni.replace(/\s/g, "").length < 7) {
+      const dniDigits = newDni.replace(/\s/g, "");
+      if (dniDigits.length > 0 && dniDigits.length < 7) {
         setMessage({ type: "error", text: "DNI debe tener al menos 7 caracteres" });
         return;
       }
+      newStudentPayload = {
+        full_name: newFullName.trim(),
+        ...(dniDigits.length > 0 ? { dni: dniDigits } : {}),
+        email: newEmail.trim() || null,
+        phone: newPhone.trim(),
+      };
     } else {
       if (!selectedStudent) {
         setMessage({ type: "error", text: "Elegí tu nombre de la lista o registrate" });
@@ -152,20 +168,17 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
         slug,
         classId,
         isNewStudent ? null : (selectedStudent?.id ?? null),
-        isNewStudent
-          ? {
-              full_name: newFullName.trim(),
-              dni: newDni.trim().replace(/\s/g, ""),
-              email: newEmail.trim() || null,
-              phone: newPhone.trim() || null,
-            }
-          : null
+        newStudentPayload
       );
       if (result.ok) {
         setMessage({ type: "success", text: "Asistencia registrada." });
         setClassId("");
-        if (isNewStudent) {
-          setStoredNames(newFullName.trim(), newDni.trim().replace(/\s/g, ""));
+        if (isNewStudent && newStudentPayload) {
+          setStoredNames(
+            newFullName.trim(),
+            newDni.replace(/\s/g, ""),
+            newPhone.trim()
+          );
           setIsNewStudent(false);
           setNewEmail("");
           setNewPhone("");
@@ -292,7 +305,18 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="new-dni">DNI</Label>
+              <Label htmlFor="new-phone">Teléfono (obligatorio)</Label>
+              <Input
+                id="new-phone"
+                type="tel"
+                placeholder="Ej. 11 1234-5678"
+                value={newPhone}
+                onChange={(e) => setNewPhone(e.target.value)}
+                autoComplete="tel"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-dni">DNI (opcional)</Label>
               <Input
                 id="new-dni"
                 type="text"
@@ -312,17 +336,6 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 autoComplete="email"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-phone">Teléfono (opcional)</Label>
-              <Input
-                id="new-phone"
-                type="tel"
-                placeholder="Ej. 11 1234-5678"
-                value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
-                autoComplete="tel"
               />
             </div>
           </div>

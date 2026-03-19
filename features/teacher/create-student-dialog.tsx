@@ -47,9 +47,9 @@ export function CreateStudentDialog() {
     try {
       await createStudentAction({
         full_name: values.full_name,
-        dni: values.dni,
+        dni: values.dni ?? "",
         email: values.email || null,
-        phone: values.phone || null,
+        phone: values.phone,
         emergency_contact_phone: values.emergency_contact_phone || null,
         apto_fisico: values.apto_fisico ?? null,
       });
@@ -77,7 +77,8 @@ export function CreateStudentDialog() {
         <DialogHeader>
           <DialogTitle>Crear alumno</DialogTitle>
           <DialogDescription id="create-student-desc">
-            Completa los datos del alumno. DNI es obligatorio y único por profesor.
+            Completa los datos del alumno. El teléfono es obligatorio. El DNI es opcional; si lo
+            cargás, debe ser único entre tus alumnos.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -100,7 +101,7 @@ export function CreateStudentDialog() {
               name="dni"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>DNI (obligatorio)</FormLabel>
+                  <FormLabel>DNI (opcional)</FormLabel>
                   <FormControl>
                     <Input placeholder="12345678" {...field} />
                   </FormControl>
@@ -126,7 +127,7 @@ export function CreateStudentDialog() {
               name="phone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Teléfono (opcional)</FormLabel>
+                  <FormLabel>Teléfono (obligatorio)</FormLabel>
                   <FormControl>
                     <Input placeholder="+54 11 1234-5678" {...field} />
                   </FormControl>

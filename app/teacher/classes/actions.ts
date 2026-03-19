@@ -5,7 +5,10 @@ import { getMyTeacherId } from "@/lib/teacher";
 import { getCurrentPeriod } from "@/repositories/periods";
 import { createClass } from "@/services/class.service";
 import { setClassAttendances } from "@/repositories/attendances";
-import { parseClassDateTimeInAppTz } from "@/lib/app-timezone";
+import {
+  canCreateClassForCalendarDate,
+  CLASS_CREATE_PAST_DAY_MESSAGE,
+} from "@/lib/class-schedule-rules";
 import type { ClassScope } from "@/types/database.types";
 
 export async function createClassAction(input: {
@@ -25,9 +28,8 @@ export async function createClassAction(input: {
   if (!currentPeriod) {
     throw new Error("No hay período activo. El administrador debe crear un período vigente.");
   }
-  const classStart = parseClassDateTimeInAppTz(input.class_date, input.start_time);
-  if (classStart.getTime() < Date.now()) {
-    throw new Error("La fecha y hora de la clase no pueden ser anteriores al momento actual.");
+  if (!canCreateClassForCalendarDate(input.class_date)) {
+    throw new Error(CLASS_CREATE_PAST_DAY_MESSAGE);
   }
   const studentIds = input.student_ids ?? [];
   const scope: ClassScope = studentIds.length > 1 ? "shared" : "individual";

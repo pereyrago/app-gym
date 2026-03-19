@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  canCreateClassForCalendarDate,
+  CLASS_CREATE_PAST_DAY_MESSAGE,
+} from "@/lib/class-schedule-rules";
 
 const DURATION_OPTIONS = [60, 90] as const;
 
@@ -12,13 +16,10 @@ const createClassBaseSchema = z.object({
     .refine((n) => (DURATION_OPTIONS as readonly number[]).includes(n), "Duración no válida"),
 });
 
+/** Solo se rechaza si el día calendario de la clase es anterior a hoy (APP_TIMEZONE). */
 export const createClassSchema = createClassBaseSchema.refine(
-  (data) => {
-    const timeStr = String(data.start_time).slice(0, 5);
-    const classStart = new Date(`${data.class_date}T${timeStr}:00`);
-    return classStart.getTime() >= Date.now();
-  },
-  { message: "La fecha y hora no pueden ser anteriores al momento actual.", path: ["class_date"] }
+  (data) => canCreateClassForCalendarDate(data.class_date),
+  { message: CLASS_CREATE_PAST_DAY_MESSAGE, path: ["class_date"] }
 );
 
 const statusOptions = ["success", "cancel_by_student", "cancel_by_teacher"] as const;

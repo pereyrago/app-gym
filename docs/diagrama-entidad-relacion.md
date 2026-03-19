@@ -114,6 +114,6 @@ La tabla **class_attendances** es la tabla de enlace entre **classes** y **stude
 ## Notas
 
 - **app_role**: ENUM `'admin' | 'profesor'`.
-- **Regla de negocio**: Las clases solo pueden editarse/eliminarse dentro de las 24 horas posteriores a `created_at` (función `class_can_edit`).
+- **Regla de negocio**: Las clases solo pueden editarse/eliminarse hasta 24 horas después del **inicio programado** (`class_date` + `start_time` en zona de la app; función `class_can_edit(class_date, start_time)`).
 - **Soft delete**: Alumnos con `deleted_at` no null se consideran borrados (no se listan en vistas normales).
 - **RLS**: Todas las tablas tienen Row Level Security; el acceso depende de `get_user_role()`, `is_admin()` y `get_my_teacher_id()`.

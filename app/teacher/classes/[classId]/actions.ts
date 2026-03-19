@@ -8,9 +8,7 @@ import {
   setClassAbsences,
   clearClassAbsences,
 } from "@/repositories/attendances";
-import { nowInAppTz, parseClassDateTimeInAppTz } from "@/lib/app-timezone";
-
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+import { assertClassEditable } from "@/lib/class-schedule-rules";
 
 export async function setAttendancesAction(classId: string, studentIds: string[]) {
   const teacherId = await getMyTeacherId();
@@ -26,14 +24,7 @@ export async function setAttendancesAction(classId: string, studentIds: string[]
     throw new Error("No autorizado");
   }
 
-  const now = nowInAppTz().getTime();
-  const classStart = parseClassDateTimeInAppTz(
-    row.class_date,
-    String(row.start_time ?? "09:00").slice(0, 5)
-  ).getTime();
-  if (now > classStart + TWENTY_FOUR_HOURS_MS) {
-    throw new Error("Esta clase ya no puede editarse (pasaron más de 24 horas desde el inicio).");
-  }
+  assertClassEditable(row.class_date, String(row.start_time ?? "09:00").slice(0, 5));
 
   await setClassAttendances(classId, studentIds);
   if (studentIds.length > 0) {
@@ -68,14 +59,7 @@ export async function setAttendancesWithAbsencesAction(
   } | null;
   if (!row || row.teacher_id !== teacherId) throw new Error("No autorizado");
 
-  const now = nowInAppTz().getTime();
-  const classStart = parseClassDateTimeInAppTz(
-    row.class_date,
-    String(row.start_time ?? "09:00").slice(0, 5)
-  ).getTime();
-  if (now > classStart + TWENTY_FOUR_HOURS_MS) {
-    throw new Error("Esta clase ya no puede editarse (pasaron más de 24 horas desde el inicio).");
-  }
+  assertClassEditable(row.class_date, String(row.start_time ?? "09:00").slice(0, 5));
 
   await setClassAttendances(classId, attendedIds);
   await setClassAbsences(classId, attendedIds, absences);
@@ -217,14 +201,7 @@ export async function cancelClassByTeacherAction(
   } | null;
   if (!row || row.teacher_id !== teacherId) throw new Error("No autorizado");
 
-  const now = nowInAppTz().getTime();
-  const classStart = parseClassDateTimeInAppTz(
-    row.class_date,
-    String(row.start_time ?? "09:00").slice(0, 5)
-  ).getTime();
-  if (now > classStart + TWENTY_FOUR_HOURS_MS) {
-    throw new Error("Esta clase ya no puede editarse (pasaron más de 24 horas desde el inicio).");
-  }
+  assertClassEditable(row.class_date, String(row.start_time ?? "09:00").slice(0, 5));
 
   await updateClassStatusAction(classId, {
     status: "cancel_by_teacher",

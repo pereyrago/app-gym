@@ -111,9 +111,11 @@ export type SubmitResult = { ok: true; studentId: string } | { ok: false; error:
 
 export type NewStudentData = {
   full_name: string;
-  dni: string;
+  /** Opcional; si se envía, se valida y puede reutilizar alumno existente por DNI. */
+  dni?: string | null;
   email?: string | null;
-  phone?: string | null;
+  /** Obligatorio para registro nuevo por QR. */
+  phone: string;
 };
 
 /**
@@ -170,21 +172,21 @@ export async function submitPublicAttendance(
     });
     if (allowedErr || !allowed) return { ok: false, error: "Alumno no encontrado" };
     sid = studentId;
-  } else if (newStudentData?.full_name?.trim() && newStudentData?.dni?.trim()) {
+  } else if (newStudentData?.full_name?.trim() && newStudentData?.phone?.trim()) {
     const name = newStudentData.full_name.trim();
-    const dni = newStudentData.dni.trim().replace(/\s/g, "");
-    if (dni.length < 7 || dni.length > 12)
-      return { ok: false, error: "DNI inválido (entre 7 y 12 caracteres)." };
-    const { data: existing } = await supabase
-      .from("students")
-      .select("id")
-      .eq("teacher_id", teacher.id)
-      .eq("dni", dni)
-      .is("deleted_at", null)
-      .maybeSingle();
-    if (existing) {
-      sid = (existing as { id: string }).id;
-    } else {
+    const phone = newStudentData.phone.trim();
+    if (phone.length > 30)
+      return { ok: false, error: "Teléfono demasiado largo (máximo 30 caracteres)." };
+
+    const dniRaw = (newStudentData.dni ?? "").trim().replace(/\s/g, "");
+    let dni: string | null = null;
+    if (dniRaw.length > 0) {
+      if (dniRaw.length < 7 || dniRaw.length > 12)
+        return { ok: false, error: "DNI inválido (entre 7 y 12 caracteres)." };
+      dni = dniRaw;
+    }
+
+    const insertNewStudent = async () => {
       const { data: newStudent, error: insertErr } = await supabase
         .from("students")
         .insert({
@@ -192,24 +194,47 @@ export async function submitPublicAttendance(
           full_name: name,
           dni,
           email: newStudentData.email?.trim() || null,
-          phone: newStudentData.phone?.trim() || null,
+          phone,
           status: AUTO_APPROVE_QR ? "active" : "to_confirm",
         } as never)
         .select("id")
         .single();
-      if (insertErr)
+      if (insertErr) {
         return {
-          ok: false,
+          ok: false as const,
           error: insertErr.message.includes("unique")
             ? "Ya existe un alumno con ese DNI."
             : "No se pudo registrar. Intenta de nuevo.",
         };
-      sid = (newStudent as { id: string }).id;
+      }
+      return { ok: true as const, id: (newStudent as { id: string }).id };
+    };
+
+    if (dni) {
+      const { data: existing } = await supabase
+        .from("students")
+        .select("id")
+        .eq("teacher_id", teacher.id)
+        .eq("dni", dni)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (existing) {
+        sid = (existing as { id: string }).id;
+      } else {
+        const ins = await insertNewStudent();
+        if (!ins.ok) return { ok: false, error: ins.error };
+        sid = ins.id;
+      }
+    } else {
+      const ins = await insertNewStudent();
+      if (!ins.ok) return { ok: false, error: ins.error };
+      sid = ins.id;
     }
   } else {
     return {
       ok: false,
-      error: "Completá nombre y DNI si no estás en la lista, o elegí tu nombre de la lista.",
+      error:
+        "Completá nombre y teléfono si no estás en la lista, o elegí tu nombre de la lista.",
     };
   }
 

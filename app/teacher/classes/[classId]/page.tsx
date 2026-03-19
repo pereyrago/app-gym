@@ -4,12 +4,10 @@ import { getClassWithAttendances } from "@/repositories/classes";
 import { getAbsencesByClassId } from "@/repositories/attendances";
 import { getStudentsByTeacher } from "@/repositories/students";
 import { getMyTeacherId } from "@/lib/teacher";
-import { nowInAppTz, parseClassDateTimeInAppTz } from "@/lib/app-timezone";
+import { classCanBeEdited } from "@/lib/class-utils";
 import { TeacherClassDetailCard } from "@/features/teacher/teacher-class-detail-card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
-
-const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 interface PageProps {
   params: Promise<{ classId: string }>;
@@ -32,12 +30,10 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
   const initialAbsentIds = absenceDetails.map((a) => a.student_id);
   const displayStatus = attendedIds.size > 0 ? "success" : (classData.status ?? "success");
 
-  const now = nowInAppTz().getTime();
-  const classStart = parseClassDateTimeInAppTz(
+  const canEdit = classCanBeEdited(
     classData.class_date,
     String(classData.start_time ?? "09:00").slice(0, 5)
-  ).getTime();
-  const canEdit = now <= classStart + TWENTY_FOUR_HOURS_MS;
+  );
   const disabledReason: "past_24h" | undefined = canEdit ? undefined : "past_24h";
 
   return (

@@ -237,7 +237,10 @@ export interface Database {
       get_user_role: { Returns: AppRole };
       is_admin: { Returns: boolean };
       get_my_teacher_id: { Returns: string | null };
-      class_can_edit: { Args: { class_created_at: string }; Returns: boolean };
+      class_can_edit: {
+        Args: { p_class_date: string; p_start_time: string };
+        Returns: boolean;
+      };
     };
     Enums: Record<string, never>;
   };

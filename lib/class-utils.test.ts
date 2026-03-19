@@ -2,15 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { classCanBeEdited } from "./class-utils";
 
 describe("classCanBeEdited", () => {
-  const originalDateNow = Date.now;
-
   beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_APP_TIMEZONE", "America/Argentina/Buenos_Aires");
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    Date.now = originalDateNow;
+    vi.unstubAllEnvs();
   });
 
   it("returns true when now is before class start", () => {
