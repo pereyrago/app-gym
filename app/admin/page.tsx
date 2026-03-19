@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Users, Calendar, Layers, FileText } from "lucide-react";
+import { BarChart3, Users, Calendar, Layers, FileText, GraduationCap } from "lucide-react";
 
 const iconCards = [
   { href: "/admin/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/admin/teachers", label: "Profesores", icon: Users },
+  { href: "/admin/students", label: "Alumnos", icon: GraduationCap },
   { href: "/admin/periods", label: "Períodos", icon: Calendar },
   { href: "/admin/class-types", label: "Tipos de clase", icon: Layers },
   { href: "/admin/reports", label: "Informes", icon: FileText },

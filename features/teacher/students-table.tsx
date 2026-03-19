@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Search, ArrowUpDown, Phone, Info } from "lucide-react";
 import type { Student } from "@/types";
 import type { StudentsSortBy, StudentsSortOrder } from "@/repositories/students";
+import { digitsOnly, whatsappUrl } from "@/lib/whatsapp-url";
 
 const DEBOUNCE_MS = 400;
 
@@ -30,17 +31,6 @@ interface StudentsTableProps {
   search: string;
   sortBy: StudentsSortBy;
   sortOrder: StudentsSortOrder;
-}
-
-/** Número solo dígitos; para wa.me se suele usar código país (ej. 54 Argentina). */
-function digitsOnly(phone: string): string {
-  return phone.replace(/\D/g, "");
-}
-
-function whatsappUrl(phone: string): string {
-  const digits = digitsOnly(phone);
-  const withCountry = digits.length <= 10 ? "54" + digits : digits;
-  return `https://wa.me/${withCountry}`;
 }
 
 function PhoneRow({ label, value }: { label: string; value: string | null }) {

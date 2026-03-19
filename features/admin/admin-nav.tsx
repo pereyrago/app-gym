@@ -23,7 +23,7 @@ export function AdminNav() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background">
-      <div className="mx-auto flex h-12 w-full max-w-2xl items-center justify-between px-3">
+      <div className="mx-auto flex h-12 w-full max-w-5xl items-center justify-between px-3">
         <nav className="flex items-center gap-2 md:gap-3" aria-label="Principal">
           <Link
             href="/admin"

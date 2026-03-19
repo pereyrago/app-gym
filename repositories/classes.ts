@@ -115,3 +115,85 @@ export async function deleteClass(id: string) {
   const { error } = await supabase.from("classes").delete().eq("id", id);
   if (error) throw error;
 }
+
+export type StudentPeriodClassRow = {
+  class: ClassWithType;
+  /** Solo hay fila si el profesor marcó asistencia o registró falta. */
+  attendance: "attended" | "absent";
+  absenceReason?: string;
+};
+
+function compareClassSchedule(a: ClassWithType, b: ClassWithType): number {
+  const d = String(a.class_date).localeCompare(String(b.class_date));
+  if (d !== 0) return d;
+  return String(a.start_time ?? "").localeCompare(String(b.start_time ?? ""));
+}
+
+/**
+ * Solo clases del período del profesor titular donde el alumno tiene **registro**:
+ * fila en `class_attendances` (marcado como asistente) o en `class_absences` (falta registrada).
+ */
+export async function getStudentPeriodClassesWithAttendance(
+  studentId: string,
+  periodId: string
+): Promise<StudentPeriodClassRow[]> {
+  const supabase = await createClient();
+  const { data: studentRow, error: stErr } = await supabase
+    .from("students")
+    .select("id, teacher_id")
+    .eq("id", studentId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (stErr) throw stErr;
+  const student = studentRow as { id: string; teacher_id: string } | null;
+  if (!student) return [];
+
+  const classes = await getClassesByTeacherAndPeriod(student.teacher_id, periodId);
+  if (classes.length === 0) return [];
+
+  const classIdsInPeriod = new Set(classes.map((c) => c.id));
+
+  const [{ data: attendances }, { data: absences }] = await Promise.all([
+    supabase.from("class_attendances").select("class_id").eq("student_id", studentId),
+    supabase
+      .from("class_absences")
+      .select("class_id, reason_type, reason_other")
+      .eq("student_id", studentId),
+  ]);
+
+  const attendedInPeriod = new Set(
+    ((attendances ?? []) as { class_id: string }[])
+      .map((a) => a.class_id)
+      .filter((id) => classIdsInPeriod.has(id))
+  );
+
+  const absenceInPeriod = new Map(
+    ((absences ?? []) as { class_id: string; reason_type: string; reason_other: string | null }[])
+      .filter((a) => classIdsInPeriod.has(a.class_id))
+      .map((a) => [a.class_id, a] as const)
+  );
+
+  const relevantIds = new Set<string>([...attendedInPeriod, ...absenceInPeriod.keys()]);
+  const classById = new Map(classes.map((c) => [c.id, c]));
+
+  const rows: StudentPeriodClassRow[] = [];
+  for (const id of relevantIds) {
+    const c = classById.get(id);
+    if (!c) continue;
+    if (attendedInPeriod.has(id)) {
+      rows.push({ class: c, attendance: "attended" });
+    } else {
+      const ab = absenceInPeriod.get(id);
+      if (!ab) continue;
+      rows.push({
+        class: c,
+        attendance: "absent",
+        absenceReason: ab.reason_other?.trim() || ab.reason_type,
+      });
+    }
+  }
+
+  rows.sort((a, b) => compareClassSchedule(a.class, b.class));
+  return rows;
+}
