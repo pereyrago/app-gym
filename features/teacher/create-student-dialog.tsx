@@ -48,10 +48,10 @@ export function CreateStudentDialog() {
       await createStudentAction({
         full_name: values.full_name,
         dni: values.dni ?? "",
-        email: values.email || null,
+        email: values.email ?? "",
         phone: values.phone,
-        emergency_contact_phone: values.emergency_contact_phone || null,
-        apto_fisico: values.apto_fisico ?? null,
+        emergency_contact_phone: values.emergency_contact_phone ?? "",
+        apto_fisico: values.apto_fisico ?? false,
       });
       toast({ title: "Alumno creado correctamente" });
       setOpen(false);
