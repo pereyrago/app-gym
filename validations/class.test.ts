@@ -19,22 +19,21 @@ describe("createClassSchema", () => {
     vi.unstubAllEnvs();
   });
 
-  it("rechaza día calendario anterior a hoy", () => {
+  it("acepta día calendario anterior a hoy (sin límite de fechas pasadas)", () => {
     vi.setSystemTime(new Date("2025-07-15T15:00:00.000Z"));
     const r = createClassSchema.safeParse({ ...base, class_date: "2025-07-14" });
-    expect(r.success).toBe(false);
-    if (!r.success) expect(r.error.flatten().fieldErrors.class_date?.length).toBeGreaterThan(0);
-  });
-
-  it("acepta hoy con hora anterior a la actual (misma regla: solo día)", () => {
-    vi.setSystemTime(new Date("2025-07-15T15:00:00.000Z"));
-    const r = createClassSchema.safeParse({ ...base, class_date: "2025-07-15", start_time: "08:00" });
     expect(r.success).toBe(true);
   });
 
-  it("acepta hoy con hora futura", () => {
+  it("acepta fecha muy en el pasado", () => {
     vi.setSystemTime(new Date("2025-07-15T15:00:00.000Z"));
-    const r = createClassSchema.safeParse({ ...base, class_date: "2025-07-15", start_time: "20:00" });
+    const r = createClassSchema.safeParse({ ...base, class_date: "2020-01-01" });
+    expect(r.success).toBe(true);
+  });
+
+  it("acepta hoy con hora anterior a la actual", () => {
+    vi.setSystemTime(new Date("2025-07-15T15:00:00.000Z"));
+    const r = createClassSchema.safeParse({ ...base, class_date: "2025-07-15", start_time: "08:00" });
     expect(r.success).toBe(true);
   });
 

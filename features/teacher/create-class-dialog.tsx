@@ -52,7 +52,6 @@ import type { ClassType } from "@/types";
 import type { Period } from "@/types";
 import type { Student } from "@/types";
 import { cn } from "@/lib/utils";
-import { nowInAppTz, toAppTzDateString } from "@/lib/app-timezone";
 
 function normalizeName(s: string): string {
   return s
@@ -253,7 +252,7 @@ export function CreateClassDialog({
                         <FormItem>
                           <FormLabel>Fecha</FormLabel>
                           <FormControl>
-                            <Input type="date" min={toAppTzDateString(nowInAppTz())} {...field} />
+                            <Input type="date" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

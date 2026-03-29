@@ -1,8 +1,4 @@
 import { z } from "zod";
-import {
-  canCreateClassForCalendarDate,
-  CLASS_CREATE_PAST_DAY_MESSAGE,
-} from "@/lib/class-schedule-rules";
 
 const DURATION_OPTIONS = [60, 90] as const;
 
@@ -16,11 +12,8 @@ const createClassBaseSchema = z.object({
     .refine((n) => (DURATION_OPTIONS as readonly number[]).includes(n), "Duración no válida"),
 });
 
-/** Solo se rechaza si el día calendario de la clase es anterior a hoy (APP_TIMEZONE). */
-export const createClassSchema = createClassBaseSchema.refine(
-  (data) => canCreateClassForCalendarDate(data.class_date),
-  { message: CLASS_CREATE_PAST_DAY_MESSAGE, path: ["class_date"] }
-);
+/** Sin restricción por fecha: se pueden crear clases en cualquier día (pasado o futuro). */
+export const createClassSchema = createClassBaseSchema;
 
 const statusOptions = ["success", "cancel_by_student", "cancel_by_teacher"] as const;
 
