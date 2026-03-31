@@ -88,7 +88,7 @@ Abrir [http://localhost:3000](http://localhost:3000). Iniciar sesión con el usu
 | `pnpm format`    | Formatear con Prettier     |
 | `pnpm test`      | Tests (Vitest)             |
 
-Pre-commit (Husky + lint-staged): ejecuta `lint-staged` y `pnpm typecheck`.
+Pre-commit (Husky + lint-staged): ejecuta `lint-staged` y `pnpm typecheck` .
 
 ## Roles
 
