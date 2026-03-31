@@ -20,9 +20,17 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { AdminStudentListRow } from "@/repositories/admin-students";
 import { whatsappUrl } from "@/lib/whatsapp-url";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Eye, Trash2 } from "lucide-react";
+import { DeleteStudentButton } from "./delete-student-button";
 
 const WHATSAPP_ICON = (
   <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden>
@@ -77,7 +85,7 @@ export function AdminStudentsTable({ students }: AdminStudentsTableProps) {
               <TableHead>Alumno</TableHead>
               <TableHead className="w-[52px] text-center">WhatsApp</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead className="w-[130px]">Clases</TableHead>
+              <TableHead className="w-[70px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -115,14 +123,31 @@ export function AdminStudentsTable({ students }: AdminStudentsTableProps) {
                 </TableCell>
                 <TableCell className="max-w-[200px] truncate text-[13px]">{s.email ?? "—"}</TableCell>
                 <TableCell>
-                  <Button variant="secondary" size="sm" className="w-full" asChild>
-                    <Link
-                      href={`/admin/students/${s.id}/classes`}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Ver clases
-                    </Link>
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded"
+                        aria-label="Abrir menú"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/admin/students/${s.id}/classes`}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver clases
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <DeleteStudentButton studentId={s.id} />
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}
@@ -173,6 +198,9 @@ export function AdminStudentsTable({ students }: AdminStudentsTableProps) {
                 <Button variant="secondary" size="sm" asChild>
                   <Link href={`/admin/students/${detail.id}/classes`}>Ver clases en las que participó</Link>
                 </Button>
+                <div className="mt-4 border-t border-border/60 pt-4">
+                  <DeleteStudentButton studentId={detail.id} />
+                </div>
               </div>
             </>
           ) : null}

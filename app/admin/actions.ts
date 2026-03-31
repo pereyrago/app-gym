@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createTeacher } from "@/services/teacher.service";
 import { getSupabaseAuthAdminClient } from "@/lib/supabase/admin";
+import { softDeleteStudent } from "@/repositories/students";
 
 export async function createTeacherAction(formData: FormData) {
   await requireAdmin();
@@ -27,6 +28,12 @@ export async function deleteTeacherAction(teacherId: string) {
   if (!teacher || !("profile_id" in teacher)) throw new Error("Profesor no encontrado");
   await supabase.auth.admin.deleteUser(teacher.profile_id as string);
   revalidatePath("/admin/teachers");
+}
+
+export async function deleteStudentAction(studentId: string) {
+  await requireAdmin();
+  await softDeleteStudent(studentId);
+  revalidatePath("/admin/students");
 }
 
 export async function resetTeacherPasswordAction(profileId: string, newPassword: string) {
