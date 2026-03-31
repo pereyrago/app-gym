@@ -55,11 +55,19 @@ export async function getReportDataForTeacher(
     classes.map(async (c) => {
       const { data: attendances } = await supabase
         .from("class_attendances")
-        .select("students(full_name)")
-        .eq("class_id", c.id);
+        .select("students!inner(full_name, status, deleted_at)")
+        .eq("class_id", c.id)
+        .is("students.deleted_at", null)
+        .eq("students.status", "active");
+
       const studentNames = (attendances ?? [])
         .map(
-          (a) => (a as unknown as { students: { full_name: string } | null }).students?.full_name
+          (a) =>
+            (
+              a as unknown as {
+                students: { full_name: string; status: string; deleted_at: string | null } | null;
+              }
+            ).students?.full_name
         )
         .filter(Boolean) as string[];
       return {
@@ -120,8 +128,10 @@ export async function getReportDataForAllTeachers(
       classes.map(async (c) => {
         const { count } = await supabase
           .from("class_attendances")
-          .select("id", { count: "exact", head: true })
-          .eq("class_id", c.id);
+          .select("students!inner(id, status, deleted_at)", { count: "exact", head: true })
+          .eq("class_id", c.id)
+          .is("students.deleted_at", null)
+          .eq("students.status", "active");
         return {
           classTypeName: c.class_types?.name ?? "Clase",
           class_date: c.class_date,
