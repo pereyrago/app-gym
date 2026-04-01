@@ -88,8 +88,10 @@ export async function softDeleteStudent(id: string) {
   if (error) throw error;
 }
 
+/**
+ * Compatibilidad: cualquier "delete" de alumno debe ser lógico.
+ * Mantiene el registro para historial/auditoría.
+ */
 export async function deleteStudent(id: string) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("students").delete().eq("id", id);
-  if (error) throw error;
+  await softDeleteStudent(id);
 }

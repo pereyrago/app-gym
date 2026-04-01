@@ -289,3 +289,91 @@ export function generateAllTeachersPdf(data: AllTeachersReportRow[]): string {
   const blob = doc.output("blob");
   return URL.createObjectURL(blob);
 }
+
+export interface StudentAttendanceReportRow {
+  studentName: string;
+  periodName: string;
+  classes: Array<{
+    class_date: string;
+    classTypeName: string;
+    teacherName: string;
+    duration_minutes: number;
+  }>;
+}
+
+export async function generateStudentAttendancePdf(
+  data: StudentAttendanceReportRow
+): Promise<string> {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const marginLeft = 10;
+  const marginTop = 10;
+  const marginRight = 10;
+  const logoPng = await svgUrlToPngDataUrl("/full_logo.svg");
+  const logoW = 22;
+  const logoH = (logoW * LOGO_RATIO_H) / LOGO_RATIO_W;
+  doc.addImage(logoPng, "PNG", marginLeft, marginTop, logoW, logoH);
+
+  const headerY = marginTop + 7.5;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Salud y Rendimiento", marginLeft + logoW + 6, headerY);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Periodo: ${data.periodName}`, pageWidth - marginRight, headerY, { align: "right" });
+
+  let y = marginTop + logoH + 14;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text(`Informe de alumno: ${data.studentName}`, marginLeft, y);
+  y += 8;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  if (data.classes.length === 0) {
+    doc.text("Sin asistencias registradas para el período.", marginLeft, y);
+    const blob = doc.output("blob");
+    return URL.createObjectURL(blob);
+  }
+
+  const tableX = marginLeft;
+  const tableW = pageWidth - marginLeft - marginRight;
+  const col1 = tableX;
+  const col2 = tableX + tableW * 0.22;
+  const col3 = tableX + tableW * 0.56;
+  const col4 = tableX + tableW * 0.83;
+  const rowH = 8;
+
+  doc.setFont("helvetica", "bold");
+  doc.rect(tableX, y, tableW, rowH);
+  doc.text("Fecha", col1 + 2, y + 5.5);
+  doc.text("Clase", col2 + 2, y + 5.5);
+  doc.text("Profesor", col3 + 2, y + 5.5);
+  doc.text("Duración", col4 + 2, y + 5.5);
+  y += rowH;
+  doc.setFont("helvetica", "normal");
+
+  for (const c of data.classes) {
+    if (y > 280) {
+      doc.addPage();
+      y = 18;
+      doc.setFont("helvetica", "bold");
+      doc.rect(tableX, y, tableW, rowH);
+      doc.text("Fecha", col1 + 2, y + 5.5);
+      doc.text("Clase", col2 + 2, y + 5.5);
+      doc.text("Profesor", col3 + 2, y + 5.5);
+      doc.text("Duración", col4 + 2, y + 5.5);
+      y += rowH;
+      doc.setFont("helvetica", "normal");
+    }
+    doc.rect(tableX, y, tableW, rowH);
+    doc.text(formatClassDate(c.class_date, "d MMM yyyy"), col1 + 2, y + 5.5);
+    doc.text(c.classTypeName, col2 + 2, y + 5.5);
+    doc.text(c.teacherName, col3 + 2, y + 5.5);
+    doc.text(`${c.duration_minutes} min`, col4 + 2, y + 5.5);
+    y += rowH;
+  }
+
+  const blob = doc.output("blob");
+  return URL.createObjectURL(blob);
+}

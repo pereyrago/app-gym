@@ -7,7 +7,6 @@ import {
   getStudentsByTeacher,
   getStudentsByTeacherCacheTag,
   updateStudentStatus,
-  softDeleteStudent,
 } from "@/repositories/students";
 import type { Student } from "@/types";
 import { createClient } from "@/lib/supabase/server";
@@ -38,11 +37,24 @@ export async function confirmStudentAction(studentId: string, classId?: string) 
 export async function rejectStudentAction(studentId: string, classId?: string) {
   const teacherId = await getMyTeacherId();
   if (!teacherId) throw new Error("No autorizado");
+  if (!classId) throw new Error("Falta classId para rechazar al alumno en esta clase.");
   const students = await getStudentsByTeacher(teacherId);
-  if (!students.some((s) => s.id === studentId)) throw new Error("Alumno no encontrado");
+  const student = students.find((s) => s.id === studentId);
+  if (!student) throw new Error("Alumno no encontrado");
   const supabase = await createClient();
-  await supabase.from("class_attendances").delete().eq("student_id", studentId);
-  await softDeleteStudent(studentId);
+  const attendanceDelete = supabase
+    .from("class_attendances")
+    .delete()
+    .eq("student_id", studentId)
+    .eq("class_id", classId);
+  const { error: attErr } = await attendanceDelete;
+  if (attErr) throw attErr;
+
+  // El profesor NO elimina alumnos globalmente: eso queda solo para admin.
+  // Si el alumno es propio, puede marcarlo como rechazado en su base.
+  if (student.teacher_id === teacherId) {
+    await updateStudentStatus(studentId, "rejected");
+  }
   revalidateStudentsCache(teacherId);
   revalidatePath("/teacher/students");
   revalidatePath("/teacher");

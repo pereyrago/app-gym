@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { TeacherReportRow, AllTeachersReportRow } from "@/lib/pdf";
+import type { StudentAttendanceReportRow } from "@/lib/pdf";
 
 export async function getReportDataForTeacher(
   teacherId: string,
@@ -150,4 +151,80 @@ export async function getReportDataForAllTeachers(
   }
 
   return result;
+}
+
+export async function getReportDataForStudent(
+  studentId: string,
+  periodId: string
+): Promise<StudentAttendanceReportRow | null> {
+  await requireAdmin();
+  const supabase = await createClient();
+
+  const { data: periodRow } = await supabase
+    .from("periods")
+    .select("name")
+    .eq("id", periodId)
+    .single();
+  const periodName = (periodRow as { name: string } | null)?.name ?? "Período";
+
+  const { data: studentRow } = await supabase
+    .from("students")
+    .select("id, full_name")
+    .eq("id", studentId)
+    .maybeSingle();
+  const student = studentRow as { id: string; full_name: string } | null;
+  if (!student) return null;
+
+  const { data: attendanceRows, error: attErr } = await supabase
+    .from("class_attendances")
+    .select(
+      `
+      class_id,
+      classes!inner (
+        class_date,
+        duration_minutes,
+        class_types (name),
+        teachers:teacher_id (profiles:profile_id(full_name, email)),
+        period_id
+      )
+    `
+    )
+    .eq("student_id", studentId)
+    .eq("classes.period_id", periodId);
+
+  if (attErr) throw attErr;
+
+  const rows = (attendanceRows ?? []) as unknown as Array<{
+    class_id: string;
+    classes: {
+      class_date: string;
+      duration_minutes: number | null;
+      class_types: { name: string } | null;
+      teachers:
+        | { profiles: { full_name: string | null; email: string } | null }
+        | { profiles: { full_name: string | null; email: string } | null }[]
+        | null;
+      period_id: string;
+    } | null;
+  }>;
+
+  return {
+    studentName: student.full_name,
+    periodName,
+    classes: rows
+      .map((r) => {
+        const c = r.classes;
+        if (!c) return null;
+        const teacherRel = Array.isArray(c.teachers) ? c.teachers[0] : c.teachers;
+        const teacherProfile = teacherRel?.profiles ?? null;
+        const teacherName = teacherProfile?.full_name ?? teacherProfile?.email ?? "Profesor";
+        return {
+          class_date: c.class_date,
+          classTypeName: c.class_types?.name ?? "Clase",
+          teacherName,
+          duration_minutes: c.duration_minutes ?? 60,
+        };
+      })
+      .filter(Boolean) as StudentAttendanceReportRow["classes"],
+  };
 }

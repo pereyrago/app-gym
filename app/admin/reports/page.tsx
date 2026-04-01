@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { getTeachersWithProfiles } from "@/repositories/teachers";
 import { getPeriods } from "@/repositories/periods";
+import { getAdminStudentsList } from "@/repositories/admin-students";
 import { ReportsView } from "@/features/admin/reports-view";
 import { ChevronLeft } from "lucide-react";
 
 export default async function AdminReportsPage() {
-  const [teachers, periods] = await Promise.all([getTeachersWithProfiles(), getPeriods()]);
+  const [teachers, periods, students] = await Promise.all([
+    getTeachersWithProfiles(),
+    getPeriods(),
+    getAdminStudentsList(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -21,7 +26,11 @@ export default async function AdminReportsPage() {
         </nav>
         <h1 className="text-lg font-semibold tracking-tight">Informes PDF</h1>
       </div>
-      <ReportsView teachers={teachers} periods={periods} />
+      <ReportsView
+        teachers={teachers}
+        periods={periods}
+        students={students.map((s) => ({ id: s.id, full_name: s.full_name }))}
+      />
     </div>
   );
 }

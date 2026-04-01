@@ -11,8 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getReportDataForTeacher, getReportDataForAllTeachers } from "@/app/admin/reports/actions";
-import { generateTeacherPdf, generateAllTeachersPdf } from "@/lib/pdf";
+import {
+  getReportDataForTeacher,
+  getReportDataForAllTeachers,
+  getReportDataForStudent,
+} from "@/app/admin/reports/actions";
+import {
+  generateTeacherPdf,
+  generateAllTeachersPdf,
+  generateStudentAttendancePdf,
+} from "@/lib/pdf";
 import { useToast } from "@/hooks/use-toast";
 import { FileDown, Loader2 } from "lucide-react";
 import type { TeacherWithProfile } from "@/types";
@@ -22,12 +30,14 @@ import { Input } from "@/components/ui/input";
 interface ReportsViewProps {
   teachers: TeacherWithProfile[];
   periods: Period[];
+  students: Array<{ id: string; full_name: string }>;
 }
 
-export function ReportsView({ teachers, periods }: ReportsViewProps) {
+export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
   const [teacherId, setTeacherId] = useState<string>("");
   const [periodId, setPeriodId] = useState<string>("");
-  const [loading, setLoading] = useState<"one" | "all" | null>(null);
+  const [studentId, setStudentId] = useState<string>("");
+  const [loading, setLoading] = useState<"one" | "all" | "student" | null>(null);
   const [group2Multiplier, setGroup2Multiplier] = useState<number>(0.75);
   const [group3Multiplier, setGroup3Multiplier] = useState<number>(0.5);
   const { toast } = useToast();
@@ -82,6 +92,35 @@ export function ReportsView({ teachers, periods }: ReportsViewProps) {
       } else {
         toast({ title: "No hay datos para el período seleccionado", variant: "destructive" });
       }
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo generar el PDF",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleStudentPdf() {
+    if (!studentId || !periodId) {
+      toast({
+        title: "Selecciona alumno y período",
+        variant: "destructive",
+      });
+      return;
+    }
+    setLoading("student");
+    try {
+      const data = await getReportDataForStudent(studentId, periodId);
+      if (!data) {
+        toast({ title: "Alumno no encontrado", variant: "destructive" });
+        return;
+      }
+      const url = await generateStudentAttendancePdf(data);
+      window.open(url, "_blank");
+      toast({ title: "PDF de alumno generado" });
     } catch (e) {
       toast({
         title: "Error",
@@ -223,6 +262,66 @@ export function ReportsView({ teachers, periods }: ReportsViewProps) {
               <FileDown className="mr-2 h-3.5 w-3.5" />
             )}
             Generar PDF todos
+          </Button>
+        </CardContent>
+      </Card>
+      <Card className="border border-border/80 shadow-none md:col-span-2">
+        <CardHeader className="p-3 pb-2">
+          <CardTitle className="text-[13px] font-medium">PDF de alumno</CardTitle>
+          <CardDescription className="text-[12px]">
+            Genera un informe de todas las clases a las que asistió un alumno en el período
+            seleccionado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 p-3 pt-0">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="report-student" className="text-[13px]">
+                Alumno
+              </Label>
+              <Select value={studentId} onValueChange={setStudentId}>
+                <SelectTrigger id="report-student">
+                  <SelectValue placeholder="Seleccionar alumno" />
+                </SelectTrigger>
+                <SelectContent>
+                  {students.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="report-period-student" className="text-[13px]">
+                Período
+              </Label>
+              <Select value={periodId} onValueChange={setPeriodId}>
+                <SelectTrigger id="report-period-student">
+                  <SelectValue placeholder="Seleccionar período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periods.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            className="h-8 rounded px-3 text-[13px] font-medium"
+            onClick={handleStudentPdf}
+            disabled={loading !== null || !studentId || !periodId}
+          >
+            {loading === "student" ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <FileDown className="mr-2 h-3.5 w-3.5" />
+            )}
+            Generar PDF alumno
           </Button>
         </CardContent>
       </Card>
