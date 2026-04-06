@@ -155,7 +155,7 @@ export function ClassAttendancesForm({
   }
 
   async function handleSubmit() {
-    if (!canEdit) return;
+    if (!canEdit || saving) return;
     const removedIds = initialAttendedIds.filter((id) => !attendedIds.has(id));
 
     if (removedIds.length > 0) {
@@ -180,6 +180,7 @@ export function ClassAttendancesForm({
   }
 
   async function handleConfirmCancelByTeacher() {
+    if (saving) return;
     if (!cancelReasonType) {
       toast({ title: "Seleccioná un motivo de cancelación", variant: "destructive" });
       return;
@@ -213,6 +214,7 @@ export function ClassAttendancesForm({
   }
 
   function handleConfirm(studentId: string) {
+    if (isPendingConfirm) return;
     startTransition(async () => {
       try {
         await confirmStudentAction(studentId, classId);
@@ -229,6 +231,7 @@ export function ClassAttendancesForm({
   }
 
   function handleReject(studentId: string) {
+    if (isPendingConfirm) return;
     startTransition(async () => {
       try {
         await rejectStudentAction(studentId, classId);
@@ -256,6 +259,7 @@ export function ClassAttendancesForm({
   }
 
   async function handleSubmitAbsenceReasons() {
+    if (saving) return;
     const invalid = removedForAbsenceDialog.find((id) => {
       const r = absentReasons[id];
       if (!r?.reason_type) return true;

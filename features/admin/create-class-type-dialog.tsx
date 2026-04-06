@@ -25,10 +25,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 export function CreateClassTypeDialog() {
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const form = useForm<CreateClassTypeInput>({
     resolver: zodResolver(createClassTypeSchema),
@@ -36,6 +37,8 @@ export function CreateClassTypeDialog() {
   });
 
   async function onSubmit(values: CreateClassTypeInput) {
+    if (saving) return;
+    setSaving(true);
     try {
       await createClassTypeAction(values);
       toast({ title: "Tipo de clase creado correctamente" });
@@ -47,6 +50,8 @@ export function CreateClassTypeDialog() {
         description: e instanceof Error ? e.message : "No se pudo crear el tipo",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -82,11 +87,18 @@ export function CreateClassTypeDialog() {
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="secondary">
-                Crear
+              <Button type="submit" variant="secondary" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creando…
+                  </>
+                ) : (
+                  "Crear"
+                )}
               </Button>
             </DialogFooter>
           </form>

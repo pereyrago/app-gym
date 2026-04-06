@@ -26,10 +26,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 export function CreatePeriodDialog() {
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const form = useForm<CreatePeriodInput>({
     resolver: zodResolver(createPeriodSchema),
@@ -41,6 +42,8 @@ export function CreatePeriodDialog() {
   });
 
   async function onSubmit(values: CreatePeriodInput) {
+    if (saving) return;
+    setSaving(true);
     try {
       await createPeriodAction(values);
       toast({ title: "Período creado correctamente" });
@@ -52,6 +55,8 @@ export function CreatePeriodDialog() {
         description: e instanceof Error ? e.message : "No se pudo crear el período",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -122,11 +127,18 @@ export function CreatePeriodDialog() {
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="secondary">
-                Crear
+              <Button type="submit" variant="secondary" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creando…
+                  </>
+                ) : (
+                  "Crear"
+                )}
               </Button>
             </DialogFooter>
           </form>

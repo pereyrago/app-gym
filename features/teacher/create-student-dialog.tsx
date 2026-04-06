@@ -45,6 +45,7 @@ export function CreateStudentDialog() {
   });
 
   async function onSubmit(values: CreateStudentInput) {
+    if (saving) return;
     setSaving(true);
     try {
       await createStudentAction({

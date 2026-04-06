@@ -109,6 +109,7 @@ export function AdminStudentsTable({ students }: AdminStudentsTableProps) {
                     <TableHead>Alumno</TableHead>
                     <TableHead className="w-[52px] text-center">WhatsApp</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Estado</TableHead>
                     <TableHead className="w-[70px]" />
                   </TableRow>
                 </TableHeader>
@@ -148,6 +149,10 @@ export function AdminStudentsTable({ students }: AdminStudentsTableProps) {
                       <TableCell className="max-w-[200px] truncate text-[13px]">
                         {s.email ?? "—"}
                       </TableCell>
+                      <TableCell className="max-w-[200px] truncate text-[13px]">
+                        {s.status ?? "—"}
+                      </TableCell>
+
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
