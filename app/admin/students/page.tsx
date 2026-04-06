@@ -21,8 +21,7 @@ export default async function AdminStudentsPage() {
         <h1 className="text-lg font-semibold tracking-tight">Alumnos</h1>
       </div>
       <p className="text-[13px] text-muted-foreground">
-        Tocá una fila para ver todos los datos del alumno y el profesor que lo registró. WhatsApp y
-        &quot;Ver clases&quot; no abren el panel.
+        Tocá una fila para ver todos los datos del alumno y el profesor que lo registró. Tocá &quot;Ver clases&quot; para ver el historial.
       </p>
       <AdminStudentsTable students={students} />
     </div>

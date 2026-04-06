@@ -71,88 +71,117 @@ export function AdminStudentsTable({ students }: AdminStudentsTableProps) {
     );
   }
 
+  // Agrupar por teacher_id para asegurar unicidad, usando el nombre para el label
+  const grouped = students.reduce(
+    (acc, s) => {
+      const tid = s.teacher_id;
+      if (!acc[tid]) {
+        acc[tid] = {
+          teacherName: s.teacher_profile_full_name?.trim() || s.teacher_profile_email?.trim() || "Profesor sin nombre",
+          students: [],
+        };
+      }
+      acc[tid].students.push(s);
+      return acc;
+    },
+    {} as Record<string, { teacherName: string; students: AdminStudentListRow[] }>
+  );
+
+  const teacherGroups = Object.values(grouped).sort((a, b) =>
+    a.teacherName.localeCompare(b.teacherName)
+  );
+
   const teacherAddedLabel = (s: AdminStudentListRow) =>
-    s.teacher_profile_full_name?.trim() ||
-    s.teacher_profile_email?.trim() ||
-    "—";
+    s.teacher_profile_full_name?.trim() || s.teacher_profile_email?.trim() || "—";
 
   return (
     <>
-      <div className="overflow-x-auto rounded-md border border-border/80">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Alumno</TableHead>
-              <TableHead className="w-[52px] text-center">WhatsApp</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead className="w-[70px]" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {students.map((s) => (
-              <TableRow
-                key={s.id}
-                className="cursor-pointer"
-                role="button"
-                tabIndex={0}
-                onClick={() => setDetail(s)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setDetail(s);
-                  }
-                }}
-              >
-                <TableCell className="font-medium capitalize">{s.full_name}</TableCell>
-                <TableCell className="text-center">
-                  {s.phone?.trim() ? (
-                    <a
-                      href={whatsappUrl(s.phone)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center justify-center rounded-md p-2 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400"
-                      title="Abrir WhatsApp"
-                      aria-label={`WhatsApp ${s.full_name}`}
-                      onClick={(e) => e.stopPropagation()}
+      <div className="space-y-10">
+        {teacherGroups.map((group) => (
+          <div key={group.teacherName} className="space-y-3">
+            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider px-1">
+              {group.teacherName}
+            </h2>
+            <div className="overflow-x-auto rounded-md border border-border/80">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Alumno</TableHead>
+                    <TableHead className="w-[52px] text-center">WhatsApp</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="w-[70px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {group.students.map((s) => (
+                    <TableRow
+                      key={s.id}
+                      className="cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setDetail(s)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setDetail(s);
+                        }
+                      }}
                     >
-                      {WHATSAPP_ICON}
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="max-w-[200px] truncate text-[13px]">{s.email ?? "—"}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded"
-                        aria-label="Abrir menú"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <MoreHorizontal className="h-3.5 w-3.5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenuItem asChild>
-                        <Link href={`/admin/students/${s.id}/classes`}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Ver clases
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <DeleteStudentButton studentId={s.id} />
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                      <TableCell className="font-medium capitalize">{s.full_name}</TableCell>
+                      <TableCell className="text-center">
+                        {s.phone?.trim() ? (
+                          <a
+                            href={whatsappUrl(s.phone)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-md p-2 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400"
+                            title="Abrir WhatsApp"
+                            aria-label={`WhatsApp ${s.full_name}`}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {WHATSAPP_ICON}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate text-[13px]">
+                        {s.email ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 rounded"
+                              aria-label="Abrir menú"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/admin/students/${s.id}/classes`}>
+                                <Eye className="mr-2 h-4 w-4" />
+                                Ver clases
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                              <DeleteStudentButton studentId={s.id} />
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        ))}
       </div>
 
       <Sheet open={detail != null} onOpenChange={(open) => !open && setDetail(null)}>
