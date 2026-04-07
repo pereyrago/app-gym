@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -10,6 +10,8 @@ import {
 } from "@/validations/class";
 import { createClassAction } from "@/app/teacher/classes/actions";
 import { getMyStudentsAction } from "@/app/teacher/students/actions";
+import { getTeacherStudentGroupsAction } from "@/app/teacher/student-groups/actions";
+import type { TeacherStudentGroupWithStudents } from "@/repositories/teacher-student-groups";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -83,6 +85,10 @@ export function CreateClassDialog({
   const [searchStep2, setSearchStep2] = useState("");
   /** false = 1:1 (un solo alumno); true = clase compartida (varios) */
   const [isSharedMode, setIsSharedMode] = useState(false);
+  /** Espejo síncrono de `isSharedMode` para lógica en handlers (evita closures viejos). */
+  const isSharedModeRef = useRef(false);
+  const [groups, setGroups] = useState<TeacherStudentGroupWithStudents[]>([]);
+  const [groupSelectNonce, setGroupSelectNonce] = useState(0);
   const { toast } = useToast();
 
   const filteredStudentsStep2 = useMemo(() => {
@@ -108,21 +114,54 @@ export function CreateClassDialog({
       setStudents([]);
       setSearchStep2("");
       setIsSharedMode(false);
+      isSharedModeRef.current = false;
       form.reset({ class_type_id: "", class_date: "", start_time: "09:00", duration_minutes: 60 });
     }
   }, [open, form]);
 
   useEffect(() => {
+    isSharedModeRef.current = isSharedMode;
+  }, [isSharedMode]);
+
+  useEffect(() => {
     if (open && step === 2) {
       setLoadingStudents(true);
-      getMyStudentsAction()
-        .then((list) =>
-          setStudents([...list].sort((a, b) => a.full_name.localeCompare(b.full_name, "es")))
-        )
+      Promise.all([getMyStudentsAction(), getTeacherStudentGroupsAction()])
+        .then(([list, grp]) => {
+          setStudents([...list].sort((a, b) => a.full_name.localeCompare(b.full_name, "es")));
+          setGroups(grp);
+        })
         .catch(() => toast({ title: "Error al cargar alumnos", variant: "destructive" }))
         .finally(() => setLoadingStudents(false));
     }
   }, [open, step, toast]);
+
+  function applyPredefinedGroup(groupId: string) {
+    const group = groups.find((g) => g.id === groupId);
+    if (!group) return;
+    const allowed = new Set(students.map((s) => s.id));
+    const ids = group.student_ids.filter((id) => allowed.has(id));
+    if (ids.length === 0) {
+      toast({
+        title: "Ningún alumno del grupo está en tu lista actual",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (ids.length > 1) {
+      isSharedModeRef.current = true;
+      setIsSharedMode(true);
+      setSelectedStudentIds((prev) => new Set([...prev, ...ids]));
+    } else {
+      const only = ids[0];
+      setSelectedStudentIds((prev) => {
+        const append = isSharedModeRef.current || prev.size > 1;
+        if (append) return new Set([...prev, only]);
+        return new Set([only]);
+      });
+    }
+    setGroupSelectNonce((n) => n + 1);
+  }
 
   function onSubmitStep1() {
     setStep(2);
@@ -132,7 +171,7 @@ export function CreateClassDialog({
     setSelectedStudentIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else if (isSharedMode) next.add(id);
+      else if (isSharedModeRef.current) next.add(id);
       else return new Set([id]); // 1:1: solo uno seleccionado
       return next;
     });
@@ -344,23 +383,53 @@ export function CreateClassDialog({
                       variant="outline"
                       size="sm"
                       className="h-8 gap-1.5 text-[12px]"
-                      onClick={() => setIsSharedMode(true)}
+                      onClick={() => {
+                        isSharedModeRef.current = true;
+                        setIsSharedMode(true);
+                      }}
                     >
                       <PlusCircle className="h-3.5 w-3.5" />
                       Agregar alumnos
                     </Button>
                   )}
                 </div>
-                <div className="relative w-full">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder="Buscar por nombre..."
-                    value={searchStep2}
-                    onChange={(e) => setSearchStep2(e.target.value)}
-                    className="h-9 w-full min-w-0 pl-10 pr-3"
-                    aria-label="Buscar alumno"
-                  />
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  {groups.length > 0 && (
+                    <div className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-[240px]">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        Grupo
+                      </span>
+                      <Select
+                        key={groupSelectNonce}
+                        onValueChange={(v) => applyPredefinedGroup(v)}
+                      >
+                        <SelectTrigger className="h-9 text-[13px]" aria-label="Agregar alumnos por grupo">
+                          <SelectValue placeholder="Agregar por grupo…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groups.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>
+                              {g.name}
+                              {g.student_ids.length > 0
+                                ? ` (${g.student_ids.length})`
+                                : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div className="relative min-w-0 flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      placeholder="Buscar por nombre..."
+                      value={searchStep2}
+                      onChange={(e) => setSearchStep2(e.target.value)}
+                      className="h-9 w-full min-w-0 pl-10 pr-3"
+                      aria-label="Buscar alumno"
+                    />
+                  </div>
                 </div>
                 <div className="rounded-md border border-border/80 max-h-[220px] overflow-y-auto">
                   <Table>

@@ -136,6 +136,26 @@ CREATE TABLE public.student_shares (
 CREATE INDEX idx_student_shares_teacher_id ON public.student_shares(teacher_id);
 CREATE INDEX idx_student_shares_student_id ON public.student_shares(student_id);
 
+-- Grupos predefinidos de alumnos por profesor (atajos al crear clases)
+CREATE TABLE public.teacher_student_groups (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  teacher_id UUID NOT NULL REFERENCES public.teachers(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_teacher_student_groups_teacher_id ON public.teacher_student_groups(teacher_id);
+
+CREATE TABLE public.teacher_student_group_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  group_id UUID NOT NULL REFERENCES public.teacher_student_groups(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (group_id, student_id)
+);
+CREATE INDEX idx_tsgm_group_id ON public.teacher_student_group_members(group_id);
+CREATE INDEX idx_tsgm_student_id ON public.teacher_student_group_members(student_id);
+
 -- Funciones de rol y helpers
 CREATE OR REPLACE FUNCTION public.get_user_role()
 RETURNS app_role LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
@@ -168,6 +188,8 @@ ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_attendances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.class_absences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_student_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teacher_student_group_members ENABLE ROW LEVEL SECURITY;
 
 -- Policies: profiles (publishable key + JWT: usuario ve/actualiza/inserta solo el propio)
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (id = auth.uid());
@@ -234,6 +256,11 @@ CREATE POLICY "Admins can manage student shares" ON public.student_shares FOR AL
 CREATE POLICY "Teachers can read their shared students" ON public.student_shares FOR SELECT
   USING (teacher_id = public.get_my_teacher_id());
 
+-- Policies: teacher_student_groups (solo el profesor dueño; no depende de helpers)
+CREATE POLICY "Teachers manage own student groups" ON public.teacher_student_groups FOR ALL
+  USING (teacher_id = public.get_my_teacher_id())
+  WITH CHECK (teacher_id = public.get_my_teacher_id());
+
 -- Helpers: alumnos visibles por profesor (propios + compartidos)
 CREATE OR REPLACE FUNCTION public.teacher_can_use_student(p_teacher_id UUID, p_student_id UUID)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -246,6 +273,24 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
       )
   );
 $$;
+
+-- Policies: teacher_student_group_members (requiere teacher_can_use_student)
+CREATE POLICY "Teachers manage members of own groups" ON public.teacher_student_group_members FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.teacher_student_groups g
+      WHERE g.id = teacher_student_group_members.group_id
+        AND g.teacher_id = public.get_my_teacher_id()
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.teacher_student_groups g
+      WHERE g.id = teacher_student_group_members.group_id
+        AND g.teacher_id = public.get_my_teacher_id()
+    )
+    AND public.teacher_can_use_student(public.get_my_teacher_id(), student_id)
+  );
 
 CREATE OR REPLACE FUNCTION public.get_students_for_teacher(
   p_teacher_id UUID,
@@ -298,6 +343,7 @@ CREATE TRIGGER set_periods_updated_at BEFORE UPDATE ON public.periods FOR EACH R
 CREATE TRIGGER set_class_types_updated_at BEFORE UPDATE ON public.class_types FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER set_students_updated_at BEFORE UPDATE ON public.students FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER set_classes_updated_at BEFORE UPDATE ON public.classes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_teacher_student_groups_updated_at BEFORE UPDATE ON public.teacher_student_groups FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 -- handle_new_user
 CREATE OR REPLACE FUNCTION public.handle_new_user()

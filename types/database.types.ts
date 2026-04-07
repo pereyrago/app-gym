@@ -231,6 +231,49 @@ export interface Database {
           created_at?: string;
         };
       };
+      teacher_student_groups: {
+        Row: {
+          id: string;
+          teacher_id: string;
+          name: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          teacher_id: string;
+          name: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          teacher_id?: string;
+          name?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      teacher_student_group_members: {
+        Row: {
+          id: string;
+          group_id: string;
+          student_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          student_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          group_id?: string;
+          student_id?: string;
+          created_at?: string;
+        };
+      };
     };
     Views: Record<string, never>;
     Functions: {

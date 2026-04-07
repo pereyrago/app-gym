@@ -8,7 +8,7 @@ import { CreateStudentDialog } from "@/features/teacher/create-student-dialog";
 import { CreateClassDialog } from "@/features/teacher/create-class-dialog";
 import { TeacherQRCard } from "@/features/teacher/teacher-qr-card";
 import { Button } from "@/components/ui/button";
-import { Users } from "lucide-react";
+import { Users, UsersRound } from "lucide-react";
 
 export default async function TeacherDashboardPage({
   searchParams,
@@ -69,6 +69,17 @@ export default async function TeacherDashboardPage({
           <Link href="/teacher/students">
             <Users className="mr-2 h-3.5 w-3.5" />
             Alumnos
+          </Link>
+        </Button>
+        <Button
+          variant="tertiary"
+          size="sm"
+          className="h-8 rounded px-3 text-[13px] font-medium"
+          asChild
+        >
+          <Link href="/teacher/student-groups">
+            <UsersRound className="mr-2 h-3.5 w-3.5" />
+            Grupos
           </Link>
         </Button>
       </div>
