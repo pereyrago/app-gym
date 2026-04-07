@@ -308,18 +308,11 @@ export function CreateClassDialog({
                       )}
                     />
                     <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
+                      <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                         Cancelar
                       </Button>
-                      <Button type="submit" variant="secondary" disabled={saving}>
-                        {saving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Siguiente…
-                          </>
-                        ) : (
-                          "Siguiente"
-                        )}
+                      <Button type="submit" variant="secondary">
+                        Siguiente
                       </Button>
                     </DialogFooter>
                   </form>

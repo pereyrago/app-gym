@@ -249,13 +249,15 @@ export async function generateTeacherPdf(
     }
     const studentsStr = c.studentNames.join(", ");
     const classInfo = `${c.classTypeName} (${c.duration_minutes}m)`;
-    
+    const alumnosMaxW = Math.max(1, tableW - 77);
+    const studentLines =
+      studentsStr.length === 0 ? [""] : doc.splitTextToSize(studentsStr, alumnosMaxW);
+
     doc.text(formatClassDate(c.class_date, "dd/MM/yyyy"), tableX + 2, y + 5);
     doc.text(classInfo, tableX + 30, y + 5);
-    doc.text(studentsStr, tableX + 75, y + 5, { maxWidth: tableW - 77 });
-    
-    // Calcular alto según texto de alumnos
-    const textHeight = doc.getTextDimensions(studentsStr, { maxWidth: tableW - 77 }).h;
+    doc.text(studentLines, tableX + 75, y + 5);
+
+    const textHeight = doc.getTextDimensions(studentLines).h;
     const finalRowH = Math.max(7, textHeight + 3);
     
     doc.line(tableX, y, tableX + tableW, y); // linea superior de fila

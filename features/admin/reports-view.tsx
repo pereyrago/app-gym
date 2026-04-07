@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -22,15 +21,20 @@ import {
   generateStudentAttendancePdf,
 } from "@/lib/pdf";
 import { useToast } from "@/hooks/use-toast";
-import { FileDown, Loader2 } from "lucide-react";
 import type { TeacherWithProfile } from "@/types";
 import type { Period } from "@/types";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ReportPdfButton, ReportPeriodField } from "@/features/admin/report-form-fields";
 
 interface ReportsViewProps {
   teachers: TeacherWithProfile[];
   periods: Period[];
   students: Array<{ id: string; full_name: string }>;
+}
+
+function pdfErrorDescription(e: unknown): string {
+  return e instanceof Error ? e.message : "No se pudo generar el PDF";
 }
 
 export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
@@ -44,7 +48,18 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
 
   const selectedPeriodName = periods.find((p) => p.id === periodId)?.name ?? "";
 
-  async function handleTeacherPdf() {
+  const toastPdfError = useCallback(
+    (e: unknown) => {
+      toast({
+        title: "Error",
+        description: pdfErrorDescription(e),
+        variant: "destructive",
+      });
+    },
+    [toast],
+  );
+
+  const handleTeacherPdf = useCallback(async () => {
     if (!teacherId || !periodId) {
       toast({
         title: "Selecciona profesor y período",
@@ -64,17 +79,20 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
         toast({ title: "PDF generado" });
       }
     } catch (e) {
-      toast({
-        title: "Error",
-        description: e instanceof Error ? e.message : "No se pudo generar el PDF",
-        variant: "destructive",
-      });
+      toastPdfError(e);
     } finally {
       setLoading(null);
     }
-  }
+  }, [
+    teacherId,
+    periodId,
+    group2Multiplier,
+    group3Multiplier,
+    toast,
+    toastPdfError,
+  ]);
 
-  async function handleAllPdf() {
+  const handleAllPdf = useCallback(async () => {
     if (!periodId) {
       toast({
         title: "Selecciona un período",
@@ -93,17 +111,13 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
         toast({ title: "No hay datos para el período seleccionado", variant: "destructive" });
       }
     } catch (e) {
-      toast({
-        title: "Error",
-        description: e instanceof Error ? e.message : "No se pudo generar el PDF",
-        variant: "destructive",
-      });
+      toastPdfError(e);
     } finally {
       setLoading(null);
     }
-  }
+  }, [periodId, toast, toastPdfError]);
 
-  async function handleStudentPdf() {
+  const handleStudentPdf = useCallback(async () => {
     if (!studentId || !periodId) {
       toast({
         title: "Selecciona alumno y período",
@@ -122,209 +136,176 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
       window.open(url, "_blank");
       toast({ title: "PDF de alumno generado" });
     } catch (e) {
-      toast({
-        title: "Error",
-        description: e instanceof Error ? e.message : "No se pudo generar el PDF",
-        variant: "destructive",
-      });
+      toastPdfError(e);
     } finally {
       setLoading(null);
     }
-  }
+  }, [studentId, periodId, toast, toastPdfError]);
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card className="border border-border/80 shadow-none">
-        <CardHeader className="p-3 pb-2">
-          <CardTitle className="text-[13px] font-medium">PDF de un profesor</CardTitle>
-          <CardDescription className="text-[12px]">
-            Genera el informe de clases y asistencias de un profesor en un período.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 p-3 pt-0">
-          <div className="space-y-2">
-            <Label htmlFor="report-teacher" className="text-[13px]">
-              Profesor
-            </Label>
-            <Select value={teacherId} onValueChange={setTeacherId}>
-              <SelectTrigger id="report-teacher">
-                <SelectValue placeholder="Seleccionar profesor" />
-              </SelectTrigger>
-              <SelectContent>
-                {teachers.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>
-                    {t.profiles?.full_name ?? t.profiles?.email ?? t.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="report-period-one">Período</Label>
-            <Select value={periodId} onValueChange={setPeriodId}>
-              <SelectTrigger id="report-period-one">
-                <SelectValue placeholder="Seleccionar período" />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+    <Tabs defaultValue="teacher" className="w-full space-y-3">
+      <TabsList className="w-full justify-start">
+        <TabsTrigger value="teacher">Profesores</TabsTrigger>
+        <TabsTrigger value="all-teachers">Todos los profesores</TabsTrigger>
+        <TabsTrigger value="student">Alumnos</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="teacher" className="mt-0">
+        <Card className="border border-border/80 shadow-none">
+          <CardHeader className="p-3 pb-2">
+            <CardTitle className="text-[13px] font-medium">PDF de un profesor</CardTitle>
+            <CardDescription className="text-[12px]">
+              Genera el informe de clases y asistencias de un profesor en un período.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 p-3 pt-0">
             <div className="space-y-2">
-              <Label htmlFor="mult-2" className="text-[13px]">
-                Multiplicador (2 alumnos)
+              <Label htmlFor="report-teacher" className="text-[13px]">
+                Profesor
               </Label>
-              <Input
-                id="mult-2"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={group2Multiplier}
-                onChange={(e) => setGroup2Multiplier(Number(e.target.value || 0))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="mult-3" className="text-[13px]">
-                Multiplicador (3+ alumnos)
-              </Label>
-              <Input
-                id="mult-3"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                value={group3Multiplier}
-                onChange={(e) => setGroup3Multiplier(Number(e.target.value || 0))}
-              />
-            </div>
-          </div>
-          {selectedPeriodName ? (
-            <div className="text-[12px] text-muted-foreground">
-              Se mostrará como <span className="font-medium">Period: {selectedPeriodName}</span> en
-              el PDF.
-            </div>
-          ) : null}
-          <Button
-            size="sm"
-            className="h-8 rounded px-3 text-[13px] font-medium"
-            onClick={handleTeacherPdf}
-            disabled={loading !== null || !teacherId || !periodId}
-          >
-            {loading === "one" ? (
-              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileDown className="mr-2 h-3.5 w-3.5" />
-            )}
-            Generar PDF
-          </Button>
-        </CardContent>
-      </Card>
-      <Card className="border border-border/80 shadow-none">
-        <CardHeader className="p-3 pb-2">
-          <CardTitle className="text-[13px] font-medium">PDF de todos los profesores</CardTitle>
-          <CardDescription className="text-[12px]">
-            Genera un informe consolidado de todos los profesores en un período.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 p-3 pt-0">
-          <div className="space-y-2">
-            <Label htmlFor="report-period-all" className="text-[13px]">
-              Período
-            </Label>
-            <Select value={periodId} onValueChange={setPeriodId}>
-              <SelectTrigger id="report-period-all">
-                <SelectValue placeholder="Seleccionar período" />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            size="sm"
-            className="h-8 rounded px-3 text-[13px] font-medium"
-            onClick={handleAllPdf}
-            disabled={loading !== null || !periodId}
-          >
-            {loading === "all" ? (
-              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileDown className="mr-2 h-3.5 w-3.5" />
-            )}
-            Generar PDF todos
-          </Button>
-        </CardContent>
-      </Card>
-      <Card className="border border-border/80 shadow-none md:col-span-2">
-        <CardHeader className="p-3 pb-2">
-          <CardTitle className="text-[13px] font-medium">PDF de alumno</CardTitle>
-          <CardDescription className="text-[12px]">
-            Genera un informe de todas las clases a las que asistió un alumno en el período
-            seleccionado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 p-3 pt-0">
-          <div className="grid gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="report-student" className="text-[13px]">
-                Alumno
-              </Label>
-              <Select value={studentId} onValueChange={setStudentId}>
-                <SelectTrigger id="report-student">
-                  <SelectValue placeholder="Seleccionar alumno" />
+              <Select value={teacherId} onValueChange={setTeacherId}>
+                <SelectTrigger id="report-teacher">
+                  <SelectValue placeholder="Seleccionar profesor" />
                 </SelectTrigger>
                 <SelectContent>
-                  {students.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.full_name}
+                  {teachers.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.profiles?.full_name ?? t.profiles?.email ?? t.id}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="report-period-student" className="text-[13px]">
-                Período
-              </Label>
-              <Select value={periodId} onValueChange={setPeriodId}>
-                <SelectTrigger id="report-period-student">
-                  <SelectValue placeholder="Seleccionar período" />
-                </SelectTrigger>
-                <SelectContent>
-                  {periods.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <ReportPeriodField
+              id="report-period-one"
+              label="Período"
+              value={periodId}
+              onChange={setPeriodId}
+              periods={periods}
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="mult-2" className="text-[13px]">
+                  Multiplicador (2 alumnos)
+                </Label>
+                <Input
+                  id="mult-2"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={group2Multiplier}
+                  onChange={(e) => setGroup2Multiplier(Number(e.target.value || 0))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mult-3" className="text-[13px]">
+                  Multiplicador (3+ alumnos)
+                </Label>
+                <Input
+                  id="mult-3"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={group3Multiplier}
+                  onChange={(e) => setGroup3Multiplier(Number(e.target.value || 0))}
+                />
+              </div>
             </div>
-          </div>
-          <Button
-            size="sm"
-            className="h-8 rounded px-3 text-[13px] font-medium"
-            onClick={handleStudentPdf}
-            disabled={loading !== null || !studentId || !periodId}
-          >
-            {loading === "student" ? (
-              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <FileDown className="mr-2 h-3.5 w-3.5" />
-            )}
-            Generar PDF alumno
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+            {selectedPeriodName ? (
+              <div className="text-[12px] text-muted-foreground">
+                Se mostrará como <span className="font-medium">Period: {selectedPeriodName}</span> en
+                el PDF.
+              </div>
+            ) : null}
+            <ReportPdfButton
+              loading={loading}
+              activeKey="one"
+              disabled={!teacherId || !periodId}
+              onClick={() => void handleTeacherPdf()}
+            >
+              Generar PDF
+            </ReportPdfButton>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="all-teachers" className="mt-0">
+        <Card className="border border-border/80 shadow-none">
+          <CardHeader className="p-3 pb-2">
+            <CardTitle className="text-[13px] font-medium">PDF de todos los profesores</CardTitle>
+            <CardDescription className="text-[12px]">
+              Genera un informe consolidado de todos los profesores en un período.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 p-3 pt-0">
+            <ReportPeriodField
+              id="report-period-all"
+              label="Período"
+              value={periodId}
+              onChange={setPeriodId}
+              periods={periods}
+            />
+            <ReportPdfButton
+              loading={loading}
+              activeKey="all"
+              disabled={!periodId}
+              onClick={() => void handleAllPdf()}
+            >
+              Generar PDF todos
+            </ReportPdfButton>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="student" className="mt-0">
+        <Card className="border border-border/80 shadow-none">
+          <CardHeader className="p-3 pb-2">
+            <CardTitle className="text-[13px] font-medium">PDF de alumno</CardTitle>
+            <CardDescription className="text-[12px]">
+              Genera un informe de todas las clases a las que asistió un alumno en el período
+              seleccionado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 p-3 pt-0">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="report-student" className="text-[13px]">
+                  Alumno
+                </Label>
+                <Select value={studentId} onValueChange={setStudentId}>
+                  <SelectTrigger id="report-student">
+                    <SelectValue placeholder="Seleccionar alumno" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <ReportPeriodField
+                id="report-period-student"
+                label="Período"
+                value={periodId}
+                onChange={setPeriodId}
+                periods={periods}
+              />
+            </div>
+            <ReportPdfButton
+              loading={loading}
+              activeKey="student"
+              disabled={!studentId || !periodId}
+              onClick={() => void handleStudentPdf()}
+            >
+              Generar PDF alumno
+            </ReportPdfButton>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 }
