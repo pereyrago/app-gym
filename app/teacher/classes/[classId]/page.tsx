@@ -4,7 +4,6 @@ import { getClassWithAttendances } from "@/repositories/classes";
 import { getAbsencesByClassId } from "@/repositories/attendances";
 import { getStudentsByTeacher } from "@/repositories/students";
 import { getMyTeacherId } from "@/lib/teacher";
-import { classCanBeEdited } from "@/lib/class-utils";
 import { TeacherClassDetailCard } from "@/features/teacher/teacher-class-detail-card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
@@ -29,12 +28,6 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
   const attendedIds = new Set((classData.class_attendances ?? []).map((a) => a.student_id));
   const initialAbsentIds = absenceDetails.map((a) => a.student_id);
   const displayStatus = attendedIds.size > 0 ? "success" : (classData.status ?? "success");
-
-  const canEdit = classCanBeEdited(
-    classData.class_date,
-    String(classData.start_time ?? "09:00").slice(0, 5)
-  );
-  const disabledReason: "past_24h" | undefined = canEdit ? undefined : "past_24h";
 
   return (
     <div className="space-y-6">
@@ -67,8 +60,7 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
         cancellationReasonOther={classData.cancellation_reason_other ?? null}
         cancellationReasonObservations={classData.cancellation_reason_observations ?? null}
         scope={classData.scope ?? "individual"}
-        canEdit={canEdit}
-        disabledReason={disabledReason}
+        canEdit
         students={students}
         initialAttendedIds={Array.from(attendedIds)}
         initialAbsentIds={initialAbsentIds}

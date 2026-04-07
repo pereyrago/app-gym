@@ -18,7 +18,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { classCanBeEdited } from "@/lib/class-utils";
 import type { Period } from "@/types";
 import type { ClassWithType } from "@/types";
 import { formatClassDate } from "@/lib/app-timezone";
@@ -93,10 +92,6 @@ export function TeacherClassesView({
           </TableHeader>
           <TableBody>
             {classes.map((c) => {
-              const editable = classCanBeEdited(
-                c.class_date,
-                String(c.start_time ?? "09:00").slice(0, 5)
-              );
               return (
                 <TableRow key={c.id}>
                   <TableCell>{formatClassDate(c.class_date)}</TableCell>
@@ -108,14 +103,12 @@ export function TeacherClassesView({
                   </TableCell>
                   <TableCell>
                     <Button
-                      variant={editable ? "secondary" : "outline"}
+                      variant="secondary"
                       size="sm"
                       className="w-full transition-colors duration-200 ease-in-out"
                       asChild
                     >
-                      <Link href={`/admin/teachers/${teacherId}/classes/${c.id}`}>
-                        {editable ? "Editar" : "Ver"}
-                      </Link>
+                      <Link href={`/admin/teachers/${teacherId}/classes/${c.id}`}>Editar</Link>
                     </Button>
                   </TableCell>
                 </TableRow>

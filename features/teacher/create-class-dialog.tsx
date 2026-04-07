@@ -239,7 +239,7 @@ export function CreateClassDialog({
           <DialogTitle>{step === 1 ? "Crear clase" : "Seleccionar asistentes"}</DialogTitle>
           <DialogDescription id="create-class-desc">
             {step === 1
-              ? "La clase podrá editarse o eliminarse hasta 24 horas después de su hora de inicio."
+              ? "Podés editar o cancelar la clase desde su ficha cuando lo necesites."
               : isSharedMode
                 ? "Selecciona todos los alumnos que asisten a esta clase compartida."
                 : "Clase individual (1:1). Selecciona el alumno o agrega más para clase compartida."}

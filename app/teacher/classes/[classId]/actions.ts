@@ -8,8 +8,6 @@ import {
   setClassAbsences,
   clearClassAbsences,
 } from "@/repositories/attendances";
-import { assertClassEditable } from "@/lib/class-schedule-rules";
-
 export async function setAttendancesAction(classId: string, studentIds: string[]) {
   const teacherId = await getMyTeacherId();
   if (!teacherId) throw new Error("No autorizado");
@@ -23,8 +21,6 @@ export async function setAttendancesAction(classId: string, studentIds: string[]
   if (!row || row.teacher_id !== teacherId) {
     throw new Error("No autorizado");
   }
-
-  assertClassEditable(row.class_date, String(row.start_time ?? "09:00").slice(0, 5));
 
   await setClassAttendances(classId, studentIds);
   if (studentIds.length > 0) {
@@ -58,8 +54,6 @@ export async function setAttendancesWithAbsencesAction(
     start_time?: string;
   } | null;
   if (!row || row.teacher_id !== teacherId) throw new Error("No autorizado");
-
-  assertClassEditable(row.class_date, String(row.start_time ?? "09:00").slice(0, 5));
 
   await setClassAttendances(classId, attendedIds);
   await setClassAbsences(classId, attendedIds, absences);
@@ -200,8 +194,6 @@ export async function cancelClassByTeacherAction(
     start_time?: string;
   } | null;
   if (!row || row.teacher_id !== teacherId) throw new Error("No autorizado");
-
-  assertClassEditable(row.class_date, String(row.start_time ?? "09:00").slice(0, 5));
 
   await updateClassStatusAction(classId, {
     status: "cancel_by_teacher",

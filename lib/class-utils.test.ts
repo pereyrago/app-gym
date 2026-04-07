@@ -1,44 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { classCanBeEdited } from "./class-utils";
+import { describe, it, expect } from "vitest";
+import { classCanBeEdited, getClassEditabilityLabel } from "./class-utils";
 
 describe("classCanBeEdited", () => {
-  beforeEach(() => {
-    vi.stubEnv("NEXT_PUBLIC_APP_TIMEZONE", "America/Argentina/Buenos_Aires");
-    vi.useFakeTimers();
+  it("siempre permite edición (sin ventana de 24h)", () => {
+    expect(classCanBeEdited("2020-01-01", "09:00")).toBe(true);
+    expect(classCanBeEdited("2030-12-31", "23:59")).toBe(true);
   });
+});
 
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.unstubAllEnvs();
-  });
-
-  it("returns true when now is before class start", () => {
-    const now = new Date("2025-03-12T14:00:00Z");
-    vi.setSystemTime(now);
-    // Class starts 2025-03-12 16:00 in app TZ - we mock so we need class_date + start_time
-    // classCanBeEdited uses parseClassDateTimeInAppTz; result depends on APP_TIMEZONE.
-    // Use a class that started 1h ago: start 13:00, now 14:00 -> 24h after start = 13:00 next day -> editable
-    expect(classCanBeEdited("2025-03-12", "13:00")).toBe(true);
-  });
-
-  it("returns true when now is exactly 24 hours after class start", () => {
-    const now = new Date("2025-03-12T12:00:00Z");
-    vi.setSystemTime(now);
-    // Class was at 2025-03-11 12:00 app TZ -> 24h later is 2025-03-12 12:00 -> still editable
-    expect(classCanBeEdited("2025-03-11", "12:00")).toBe(true);
-  });
-
-  it("returns false when now is more than 24 hours after class start", () => {
-    // Class 2025-03-11 12:00 in America/Argentina/Buenos_Aires = 2025-03-11T15:00:00Z (UTC-3)
-    // 24h after = 2025-03-12T15:00:00Z. Set now to 15:01 UTC so we're past the window.
-    const now = new Date("2025-03-12T15:01:00Z");
-    vi.setSystemTime(now);
-    expect(classCanBeEdited("2025-03-11", "12:00")).toBe(false);
-  });
-
-  it("returns true when class start is in the future", () => {
-    const now = new Date("2025-03-12T10:00:00Z");
-    vi.setSystemTime(now);
-    expect(classCanBeEdited("2025-03-12", "18:00")).toBe(true);
+describe("getClassEditabilityLabel", () => {
+  it("indica editable", () => {
+    expect(getClassEditabilityLabel("2025-03-12", "10:00")).toBe("Editable");
   });
 });

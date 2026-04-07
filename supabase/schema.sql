@@ -172,12 +172,6 @@ AS $$ SELECT t.id FROM public.teachers t JOIN public.profiles p ON p.id = t.prof
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$ BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
 
--- Edición de clase hasta 24h después del inicio (por fecha/hora de la clase)
-CREATE OR REPLACE FUNCTION public.class_can_edit(p_class_date DATE, p_start_time TIME)
-RETURNS boolean LANGUAGE sql STABLE AS $$
-  SELECT now() <= ((p_class_date + p_start_time) AT TIME ZONE 'America/Argentina/Buenos_Aires') + interval '24 hours';
-$$;
-
 -- RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
@@ -219,22 +213,22 @@ CREATE POLICY "Public can read students of teachers with slug" ON public.student
 CREATE POLICY "Public can insert student for teacher with slug" ON public.students FOR INSERT TO anon
   WITH CHECK (EXISTS (SELECT 1 FROM public.teachers t WHERE t.id = students.teacher_id AND t.public_slug IS NOT NULL AND t.public_slug <> ''));
 
--- Policies: classes (24h desde inicio de clase)
+-- Policies: classes
 CREATE POLICY "Teachers can select own classes" ON public.classes FOR SELECT USING (teacher_id = public.get_my_teacher_id());
 CREATE POLICY "Teachers can insert own classes" ON public.classes FOR INSERT WITH CHECK (teacher_id = public.get_my_teacher_id());
-CREATE POLICY "Teachers can update own classes within 24h" ON public.classes FOR UPDATE
-  USING (teacher_id = public.get_my_teacher_id() AND public.class_can_edit(class_date, start_time))
+CREATE POLICY "Teachers can update own classes" ON public.classes FOR UPDATE
+  USING (teacher_id = public.get_my_teacher_id())
   WITH CHECK (teacher_id = public.get_my_teacher_id());
-CREATE POLICY "Teachers can delete own classes within 24h" ON public.classes FOR DELETE
-  USING (teacher_id = public.get_my_teacher_id() AND public.class_can_edit(class_date, start_time));
+CREATE POLICY "Teachers can delete own classes" ON public.classes FOR DELETE
+  USING (teacher_id = public.get_my_teacher_id());
 CREATE POLICY "Admins can view all classes" ON public.classes FOR SELECT USING (public.is_admin());
 CREATE POLICY "Public can read classes of teachers with slug" ON public.classes FOR SELECT TO anon
   USING (EXISTS (SELECT 1 FROM public.teachers t WHERE t.id = classes.teacher_id AND t.public_slug IS NOT NULL AND t.public_slug <> ''));
 CREATE POLICY "Admins can insert classes for any teacher" ON public.classes FOR INSERT WITH CHECK (public.is_admin());
-CREATE POLICY "Admins can update classes within 24h" ON public.classes FOR UPDATE
-  USING (public.is_admin() AND public.class_can_edit(class_date, start_time)) WITH CHECK (public.is_admin());
-CREATE POLICY "Admins can delete classes within 24h" ON public.classes FOR DELETE
-  USING (public.is_admin() AND public.class_can_edit(class_date, start_time));
+CREATE POLICY "Admins can update any class" ON public.classes FOR UPDATE
+  USING (public.is_admin()) WITH CHECK (public.is_admin());
+CREATE POLICY "Admins can delete any class" ON public.classes FOR DELETE
+  USING (public.is_admin());
 
 -- Policies: class_attendances (anon puede insertar asistencia para clases de profes con slug)
 CREATE POLICY "Teachers can manage attendances for own classes" ON public.class_attendances FOR ALL

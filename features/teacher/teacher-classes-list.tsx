@@ -18,7 +18,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { classCanBeEdited } from "@/lib/class-utils";
 import { formatClassDate } from "@/lib/app-timezone";
 import type { Period } from "@/types";
 import type { ClassWithType } from "@/types";
@@ -82,14 +81,7 @@ export function TeacherClassesList({
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-3 w-3 shrink-0 rounded-sm bg-green-500" aria-hidden />
-            Realizada (editar)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className="h-3 w-3 shrink-0 rounded-sm border border-input bg-background"
-              aria-hidden
-            />
-            Ver (solo consulta)
+            Realizada
           </span>
         </div>
       )}
@@ -109,10 +101,6 @@ export function TeacherClassesList({
           </TableHeader>
           <TableBody>
             {classes.map((c) => {
-              const editable = classCanBeEdited(
-                c.class_date,
-                String(c.start_time ?? "09:00").slice(0, 5)
-              );
               const cancelledByStudent = c.status === "cancel_by_student";
               const cancelledByTeacher = c.status === "cancel_by_teacher";
               const cancelledButtonClass = cancelledByStudent
@@ -131,18 +119,12 @@ export function TeacherClassesList({
                   </TableCell>
                   <TableCell>
                     <Button
-                      variant={
-                        cancelledByStudent || cancelledByTeacher
-                          ? "outline"
-                          : editable
-                            ? "secondary"
-                            : "outline"
-                      }
+                      variant={cancelledByStudent || cancelledByTeacher ? "outline" : "secondary"}
                       size="sm"
                       className={cancelledButtonClass}
                       asChild
                     >
-                      <Link href={`/teacher/classes/${c.id}`}>{editable ? "Editar" : "Ver"}</Link>
+                      <Link href={`/teacher/classes/${c.id}`}>Editar</Link>
                     </Button>
                   </TableCell>
                 </TableRow>

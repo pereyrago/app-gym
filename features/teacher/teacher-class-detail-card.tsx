@@ -23,7 +23,6 @@ interface TeacherClassDetailCardProps {
   cancellationReasonObservations?: string | null;
   scope: "individual" | "shared";
   canEdit: boolean;
-  disabledReason?: "past_24h";
   students: Student[];
   initialAttendedIds: string[];
   initialAbsentIds: string[];
@@ -43,7 +42,6 @@ export function TeacherClassDetailCard({
   cancellationReasonObservations,
   scope,
   canEdit,
-  disabledReason,
   students,
   initialAttendedIds,
   initialAbsentIds,
@@ -87,7 +85,6 @@ export function TeacherClassDetailCard({
           initialAbsentIds={initialAbsentIds}
           absenceDetails={absenceDetails}
           canEdit={canEdit}
-          disabledReason={disabledReason}
         />
       </CardContent>
     </Card>

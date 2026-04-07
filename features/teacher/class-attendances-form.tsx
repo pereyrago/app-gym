@@ -60,8 +60,6 @@ function normalize(s: string): string {
     .replace(/\p{Diacritic}/gu, "");
 }
 
-type DisabledReason = "past_24h";
-
 interface ClassAttendancesFormProps {
   classId: string;
   scope: "individual" | "shared";
@@ -72,8 +70,6 @@ interface ClassAttendancesFormProps {
   /** Detalle del motivo por alumno ausente (para mostrar al hacer clic en Canceló). */
   absenceDetails: AbsenceDetail[];
   canEdit: boolean;
-  /** Motivo por el que está deshabilitado (solo cuando canEdit es false). */
-  disabledReason?: DisabledReason;
 }
 
 export function ClassAttendancesForm({
@@ -84,7 +80,6 @@ export function ClassAttendancesForm({
   initialAbsentIds,
   absenceDetails,
   canEdit,
-  disabledReason,
 }: ClassAttendancesFormProps) {
   const [attendedIds, setAttendedIds] = useState<Set<string>>(new Set(initialAttendedIds));
   const [search, setSearch] = useState("");
@@ -313,11 +308,6 @@ export function ClassAttendancesForm({
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-medium">{canEdit ? "Marcar asistentes" : "Asistentes"}</h2>
-      {!canEdit && (
-        <p className="text-sm text-amber-600 dark:text-amber-400">
-          Esta clase ya no puede editarse (pasaron más de 24 horas desde el inicio).
-        </p>
-      )}
       <div className="relative w-full">
         <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
         <Input
