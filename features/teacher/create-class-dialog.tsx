@@ -139,6 +139,7 @@ export function CreateClassDialog({
   }
 
   async function handleConfirmStep2() {
+    if (saving) return;
     const values = form.getValues();
     const valid = await form.trigger();
     if (!valid) return;

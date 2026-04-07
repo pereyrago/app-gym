@@ -110,7 +110,13 @@ export async function generateTeacherPdf(
   doc.setFont("helvetica", "bold");
   doc.setFontSize(12);
   doc.text(data.teacherName, marginLeft, y);
-  y += 10;
+  
+  const totalMinutes = data.classes.reduce((sum, c) => sum + (c.duration_minutes ?? 60), 0);
+  const totalHours = totalMinutes / 60;
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Total de horas trabajadas en el periodo: ${formatNumber(totalHours)} hs`, marginLeft, y + 5);
+  y += 15;
 
   function countBy(duration: 60 | 90) {
     const counts = { one: 0, two: 0, threePlus: 0 };
@@ -128,84 +134,52 @@ export async function generateTeacherPdf(
 
   const rows: Array<{
     label: string;
+    type: string;
     qty: number;
     students: number;
     multiplier: number;
     total: number;
   }> = [];
 
-  const counts60 = countBy(60);
-  if (counts60.one > 0) {
-    rows.push({
-      label: "Clases individuales x 60min",
-      qty: counts60.one,
-      students: 1,
-      multiplier: 1,
-      total: counts60.one * 1 * 1,
-    });
-  }
-  if (counts60.two > 0) {
-    rows.push({
-      label: "Clases grupales (2) x 60min",
-      qty: counts60.two,
-      students: 2,
-      multiplier: group2StudentMultiplier,
-      total: counts60.two * 2 * group2StudentMultiplier,
-    });
-  }
-  if (counts60.threePlus > 0) {
-    rows.push({
-      label: "Clases grupales (3) x 60min",
-      qty: counts60.threePlus,
-      students: 3,
-      multiplier: group3StudentMultiplier,
-      total: counts60.threePlus * 3 * group3StudentMultiplier,
-    });
+  // Agrupamos por Type + Duration + StudentsCount (1, 2, 3+)
+  const groups: Record<string, { qty: number; type: string; dur: number; count: number }> = {};
+  for (const c of data.classes) {
+    const dur = (c.duration_minutes ?? 60) === 90 ? 90 : 60;
+    const cat = c.attendancesCount <= 1 ? 1 : c.attendancesCount === 2 ? 2 : 3;
+    const key = `${c.classTypeName}-${dur}-${cat}`;
+    if (!groups[key]) {
+      groups[key] = { qty: 0, type: c.classTypeName, dur, count: cat };
+    }
+    groups[key].qty++;
   }
 
-  if (has90) {
-    const counts90 = countBy(90);
-    if (counts90.one > 0) {
-      rows.push({
-        label: "Clases individuales x 90min",
-        qty: counts90.one,
-        students: 1,
-        multiplier: 1,
-        total: counts90.one * 1 * 1,
-      });
-    }
-    if (counts90.two > 0) {
-      rows.push({
-        label: "Clases grupales (2) x 90min",
-        qty: counts90.two,
-        students: 2,
-        multiplier: group2StudentMultiplier,
-        total: counts90.two * 2 * group2StudentMultiplier,
-      });
-    }
-    if (counts90.threePlus > 0) {
-      rows.push({
-        label: "Clases grupales (3) x 90min",
-        qty: counts90.threePlus,
-        students: 3,
-        multiplier: group3StudentMultiplier,
-        total: counts90.threePlus * 3 * group3StudentMultiplier,
-      });
-    }
+  for (const key in groups) {
+    const g = groups[key];
+    const mult = g.count === 1 ? 1 : g.count === 2 ? group2StudentMultiplier : group3StudentMultiplier;
+    const label = g.count === 1 ? "Individual" : g.count === 2 ? "Grupal (2)" : "Grupal (3+)";
+    rows.push({
+      label: `${label} x ${g.dur}m`,
+      type: g.type,
+      qty: g.qty,
+      students: g.count,
+      multiplier: mult,
+      total: g.qty * g.count * mult,
+    });
   }
 
   doc.setFontSize(10);
   const tableX = marginLeft;
   const tableW = pageWidth - marginLeft - marginRight;
-  const col1 = tableX;
-  const col2 = tableX + tableW * 0.52;
-  const col3 = tableX + tableW * 0.67;
-  const col4 = tableX + tableW * 0.79;
-  const col5 = tableX + tableW * 0.90;
+  const colType = tableX;
+  const colClass = tableX + tableW * 0.35;
+  const colQty = tableX + tableW * 0.58;
+  const colStud = tableX + tableW * 0.70;
+  const colMult = tableX + tableW * 0.82;
+  const colTot = tableX + tableW * 0.92;
   const rowH = 8;
 
   doc.setFont("helvetica", "bold");
-  doc.text("Resumen", tableX, y);
+  doc.text("Resumen de Liquidación", tableX, y);
   y += 6;
 
   if (rows.length === 0) {
@@ -217,24 +191,79 @@ export async function generateTeacherPdf(
 
   // Header row
   doc.setDrawColor(180);
-  doc.rect(tableX, y, tableW, rowH);
-  doc.text("Clase", col1 + 2, y + 5.5);
-  doc.text("Cantidad", col2 + 2, y + 5.5);
-  doc.text("Alumnos", col3 + 2, y + 5.5);
-  doc.text("Multiplicador", col4 + 2, y + 5.5);
-  doc.text("Total", col5 + 2, y + 5.5);
+  doc.setFillColor(245, 245, 245);
+  doc.rect(tableX, y, tableW, rowH, "FD");
+  doc.setFontSize(9);
+  doc.text("Tipo de Clase", colType + 2, y + 5.5);
+  doc.text("Categoría", colClass + 2, y + 5.5);
+  doc.text("Cant.", colQty + 2, y + 5.5);
+  doc.text("Alum.", colStud + 2, y + 5.5);
+  doc.text("Mult.", colMult + 2, y + 5.5);
+  doc.text("Total", colTot + 2, y + 5.5);
   y += rowH;
 
   doc.setFont("helvetica", "normal");
+  let grandTotal = 0;
   for (const r of rows) {
     doc.rect(tableX, y, tableW, rowH);
-    doc.text(r.label, col1 + 2, y + 5.5);
-    doc.text(String(r.qty), col2 + 2, y + 5.5);
-    doc.text(String(r.students), col3 + 2, y + 5.5);
-    doc.text(formatNumber(r.multiplier), col4 + 2, y + 5.5);
-    doc.text(formatNumber(r.total), col5 + 2, y + 5.5);
+    doc.text(r.type, colType + 2, y + 5.5, { maxWidth: colClass - colType - 4 });
+    doc.text(r.label, colClass + 2, y + 5.5);
+    doc.text(String(r.qty), colQty + 2, y + 5.5);
+    doc.text(String(r.students), colStud + 2, y + 5.5);
+    doc.text(formatNumber(r.multiplier), colMult + 2, y + 5.5);
+    doc.text(formatNumber(r.total), colTot + 2, y + 5.5);
+    grandTotal += r.total;
     y += rowH;
   }
+
+  doc.setFont("helvetica", "bold");
+  doc.rect(tableX, y, tableW, rowH);
+  doc.text("TOTAL UNIDADES", colMult - 20, y + 5.5);
+  doc.text(formatNumber(grandTotal), colTot + 2, y + 5.5);
+  y += rowH + 12;
+
+  // Detalle de clases
+  if (y > 240) {
+    doc.addPage();
+    y = marginTop + 10;
+  }
+
+  doc.setFontSize(11);
+  doc.text("Detalle Cronológico de Clases", tableX, y);
+  y += 6;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setFillColor(250, 250, 250);
+  doc.rect(tableX, y, tableW, rowH, "FD");
+  doc.text("Fecha", tableX + 2, y + 5.5);
+  doc.text("Tipo", tableX + 30, y + 5.5);
+  doc.text("Alumnos", tableX + 75, y + 5.5);
+  y += rowH;
+
+  doc.setFont("helvetica", "normal");
+  for (const c of data.classes) {
+    if (y > 275) {
+      doc.addPage();
+      y = marginTop + 10;
+    }
+    const studentsStr = c.studentNames.join(", ");
+    const classInfo = `${c.classTypeName} (${c.duration_minutes}m)`;
+    const alumnosMaxW = Math.max(1, tableW - 77);
+    const studentLines =
+      studentsStr.length === 0 ? [""] : doc.splitTextToSize(studentsStr, alumnosMaxW);
+
+    doc.text(formatClassDate(c.class_date, "dd/MM/yyyy"), tableX + 2, y + 5);
+    doc.text(classInfo, tableX + 30, y + 5);
+    doc.text(studentLines, tableX + 75, y + 5);
+
+    const textHeight = doc.getTextDimensions(studentLines).h;
+    const finalRowH = Math.max(7, textHeight + 3);
+    
+    doc.line(tableX, y, tableX + tableW, y); // linea superior de fila
+    y += finalRowH;
+  }
+  doc.line(tableX, y, tableX + tableW, y); // linea final
 
   const blob = doc.output("blob");
   return URL.createObjectURL(blob);
@@ -273,7 +302,9 @@ export function generateAllTeachersPdf(data: AllTeachersReportRow[]): string {
     doc.text(teacher.teacherName, 14, y);
     y += 6;
     doc.setFont("helvetica", "normal");
-    doc.text(`Total clases: ${teacher.totalClasses}`, 14, y);
+    const totalMinutes = teacher.classes.reduce((sum, c) => sum + (c.duration_minutes ?? 60), 0);
+    const totalHours = totalMinutes / 60;
+    doc.text(`Total clases: ${teacher.totalClasses}  |  Total horas: ${formatNumber(totalHours)} hs`, 14, y);
     y += 8;
     for (const c of teacher.classes) {
       doc.text(

@@ -26,10 +26,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
 export function CreateStudentDialog() {
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const form = useForm<CreateStudentInput>({
     resolver: zodResolver(createStudentSchema),
@@ -44,6 +45,8 @@ export function CreateStudentDialog() {
   });
 
   async function onSubmit(values: CreateStudentInput) {
+    if (saving) return;
+    setSaving(true);
     try {
       await createStudentAction({
         full_name: values.full_name,
@@ -62,6 +65,8 @@ export function CreateStudentDialog() {
         description: e instanceof Error ? e.message : "No se pudo crear el alumno",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -163,11 +168,18 @@ export function CreateStudentDialog() {
               )}
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={saving}>
                 Cancelar
               </Button>
-              <Button type="submit" variant="secondary">
-                Crear
+              <Button type="submit" variant="secondary" disabled={saving}>
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creando…
+                  </>
+                ) : (
+                  "Crear"
+                )}
               </Button>
             </DialogFooter>
           </form>
