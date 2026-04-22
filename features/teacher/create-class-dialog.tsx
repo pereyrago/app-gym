@@ -393,7 +393,7 @@ export function CreateClassDialog({
                     </Button>
                   )}
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                   {groups.length > 0 && (
                     <div className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-[240px]">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

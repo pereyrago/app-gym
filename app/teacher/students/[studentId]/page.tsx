@@ -13,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { StudentDetailActions } from "@/features/teacher/student-detail-actions";
+import type { Student } from "@/types";
 
 type ClassRow = {
   id: string;
@@ -52,13 +54,12 @@ export default async function TeacherStudentHistoryPage({ params }: PageProps) {
 
   const { data: studentRow } = await supabase
     .from("students")
-    .select("id, full_name, phone, email, dni")
+    .select("*")
     .eq("id", studentId)
     .maybeSingle();
-  const student = studentRow as
-    | { id: string; full_name: string; phone: string | null; email: string | null; dni: string | null }
-    | null;
-  if (!student) notFound();
+  
+  if (!studentRow) notFound();
+  const student = studentRow as Student;
 
   const isAdmin = profile.role === "admin";
 
@@ -83,47 +84,28 @@ export default async function TeacherStudentHistoryPage({ params }: PageProps) {
   const absenceByClassId = new Map(absencesList.map((a) => [a.class_id, a]));
 
   const classIds = Array.from(new Set([...attendedIds, ...absenceByClassId.keys()]));
-  if (classIds.length === 0) {
-    return (
-      <div className="space-y-6">
-        <nav aria-label="Breadcrumb" className="mb-1">
-          <Link
-            href="/teacher/students"
-            className="inline-flex items-center text-[13px] text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="mr-1 h-3.5 w-3.5" />
-            Alumnos
-          </Link>
-        </nav>
-        <div className="space-y-1">
-          <h1 className="text-lg font-semibold tracking-tight capitalize">{student.full_name}</h1>
-          <p className="text-[13px] text-muted-foreground">Historial de clases</p>
-        </div>
-        <div className="rounded border border-border/80 p-6 text-center text-[13px] text-muted-foreground">
-          Sin clases registradas para este alumno.
-        </div>
-      </div>
-    );
+
+  let classes: ClassRow[] = [];
+  if (classIds.length > 0) {
+    let classesQuery = supabase
+      .from("classes")
+      .select(
+        isAdmin
+          ? "id, teacher_id, class_date, start_time, duration_minutes, status, scope, class_types(name), teachers:teacher_id(profiles:profile_id(full_name,email))"
+          : "id, teacher_id, class_date, start_time, duration_minutes, status, scope, class_types(name)"
+      )
+      .in("id", classIds)
+      .order("class_date", { ascending: false })
+      .order("start_time", { ascending: false });
+
+    if (!isAdmin && myTeacherId) {
+      classesQuery = classesQuery.eq("teacher_id", myTeacherId);
+    }
+
+    const { data: classesData, error: classesErr } = await classesQuery;
+    if (classesErr) throw classesErr;
+    classes = (classesData ?? []) as unknown as ClassRow[];
   }
-
-  let classesQuery = supabase
-    .from("classes")
-    .select(
-      isAdmin
-        ? "id, teacher_id, class_date, start_time, duration_minutes, status, scope, class_types(name), teachers:teacher_id(profiles:profile_id(full_name,email))"
-        : "id, teacher_id, class_date, start_time, duration_minutes, status, scope, class_types(name)"
-    )
-    .in("id", classIds)
-    .order("class_date", { ascending: false })
-    .order("start_time", { ascending: false });
-
-  if (!isAdmin && myTeacherId) {
-    classesQuery = classesQuery.eq("teacher_id", myTeacherId);
-  }
-
-  const { data: classesData, error: classesErr } = await classesQuery;
-  if (classesErr) throw classesErr;
-  const classes = (classesData ?? []) as unknown as ClassRow[];
 
   return (
     <div className="space-y-6">
@@ -137,53 +119,68 @@ export default async function TeacherStudentHistoryPage({ params }: PageProps) {
         </Link>
       </nav>
 
-      <div className="space-y-1">
-        <h1 className="text-lg font-semibold tracking-tight capitalize">{student.full_name}</h1>
-        <p className="text-[13px] text-muted-foreground">Historial de clases</p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-lg font-semibold tracking-tight capitalize">{student.full_name}</h1>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted-foreground">
+            {student.phone && <span>Tel: {student.phone}</span>}
+            {student.email && <span>Email: {student.email}</span>}
+            {student.dni && <span>DNI: {student.dni}</span>}
+          </div>
+        </div>
+        {!isAdmin && <StudentDetailActions student={student} />}
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Fecha</TableHead>
-            <TableHead>Hora</TableHead>
-            <TableHead>Duración</TableHead>
-            <TableHead>Tipo</TableHead>
-            {isAdmin ? <TableHead>Profesor</TableHead> : null}
-            <TableHead>Estado</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {classes.map((c) => {
-            const attended = attendedIds.has(c.id);
-            const absence = absenceByClassId.get(c.id);
-            const statusLabel = attended
-              ? "Asistió"
-              : absence
-                ? `Faltó (${absence.reason_other?.trim() || absence.reason_type})`
-                : "—";
-
-            const teacherName =
-              c.teachers?.profiles?.full_name ?? c.teachers?.profiles?.email ?? "—";
-
-            return (
-              <TableRow key={c.id}>
-                <TableCell>
-                  {formatClassDate(c.class_date, "d MMM yyyy")}
-                </TableCell>
-                <TableCell className="font-mono text-[13px]">
-                  {String(c.start_time).slice(0, 5)}
-                </TableCell>
-                <TableCell>{c.duration_minutes ?? 60} min</TableCell>
-                <TableCell className="capitalize">{c.class_types?.name ?? "Clase"}</TableCell>
-                {isAdmin ? <TableCell className="capitalize">{teacherName}</TableCell> : null}
-                <TableCell>{statusLabel}</TableCell>
+      <div className="space-y-4">
+        <h2 className="text-sm font-medium">Historial de clases</h2>
+        {classes.length === 0 ? (
+          <div className="rounded border border-border/80 p-6 text-center text-[13px] text-muted-foreground">
+            Sin clases registradas para este alumno.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Hora</TableHead>
+                <TableHead>Duración</TableHead>
+                <TableHead>Tipo</TableHead>
+                {isAdmin ? <TableHead>Profesor</TableHead> : null}
+                <TableHead>Estado</TableHead>
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+            </TableHeader>
+            <TableBody>
+              {classes.map((c) => {
+                const attended = attendedIds.has(c.id);
+                const absence = absenceByClassId.get(c.id);
+                const statusLabel = attended
+                  ? "Asistió"
+                  : absence
+                    ? `Faltó (${absence.reason_other?.trim() || absence.reason_type})`
+                    : "—";
+
+                const teacherName =
+                  c.teachers?.profiles?.full_name ?? c.teachers?.profiles?.email ?? "—";
+
+                return (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      {formatClassDate(c.class_date, "d MMM yyyy")}
+                    </TableCell>
+                    <TableCell className="font-mono text-[13px]">
+                      {String(c.start_time).slice(0, 5)}
+                    </TableCell>
+                    <TableCell>{c.duration_minutes ?? 60} min</TableCell>
+                    <TableCell className="capitalize">{c.class_types?.name ?? "Clase"}</TableCell>
+                    {isAdmin ? <TableCell className="capitalize">{teacherName}</TableCell> : null}
+                    <TableCell>{statusLabel}</TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </div>
     </div>
   );
 }
-

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getClassWithAttendances } from "@/repositories/classes";
 import { getAbsencesByClassId } from "@/repositories/attendances";
 import { getStudentsByTeacher } from "@/repositories/students";
+import { getClassTypes } from "@/repositories/class-types";
 import { getMyTeacherId } from "@/lib/teacher";
 import { TeacherClassDetailCard } from "@/features/teacher/teacher-class-detail-card";
 import { Button } from "@/components/ui/button";
@@ -17,10 +18,11 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
   const teacherId = await getMyTeacherId();
   if (!teacherId) notFound();
 
-  const [classData, students, absenceDetails] = await Promise.all([
+  const [classData, students, absenceDetails, classTypes] = await Promise.all([
     getClassWithAttendances(classId),
     getStudentsByTeacher(teacherId),
     getAbsencesByClassId(classId),
+    getClassTypes(),
   ]);
 
   if (!classData || classData.teacher_id !== teacherId) notFound();
@@ -50,6 +52,7 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
       </Button>
       <TeacherClassDetailCard
         classId={classId}
+        classTypeId={classData.class_type_id}
         classTypeName={classData.class_types?.name ?? "Clase"}
         classDate={classData.class_date}
         startTime={classData.start_time ?? null}
@@ -65,6 +68,7 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
         initialAttendedIds={Array.from(attendedIds)}
         initialAbsentIds={initialAbsentIds}
         absenceDetails={absenceDetails}
+        classTypes={classTypes}
       />
     </div>
   );

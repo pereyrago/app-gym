@@ -66,6 +66,21 @@ export async function createStudent(input: TablesInsert<"students">) {
   return data;
 }
 
+export async function updateStudent(
+  id: string,
+  input: Partial<TablesInsert<"students">>
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("students")
+    .update(input as never)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function updateStudentStatus(
   id: string,
   status: "active" | "to_confirm" | "rejected"
