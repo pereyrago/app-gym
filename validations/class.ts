@@ -12,8 +12,15 @@ const createClassBaseSchema = z.object({
     .refine((n) => (DURATION_OPTIONS as readonly number[]).includes(n), "Duración no válida"),
 });
 
-/** Sin restricción por fecha: se pueden crear clases en cualquier día (pasado o futuro). */
+/** Esquema para creación individual. */
 export const createClassSchema = createClassBaseSchema;
+
+/** Esquema para creación múltiple (bulk). */
+export const createMultipleClassesSchema = createClassBaseSchema
+  .omit({ class_date: true })
+  .extend({
+    class_dates: z.array(z.string().min(1)).min(1, "Seleccione al menos una fecha"),
+  });
 
 const statusOptions = ["success", "cancel_by_student", "cancel_by_teacher"] as const;
 
@@ -35,6 +42,7 @@ export const updateClassSchema = createClassBaseSchema
   );
 
 export type CreateClassInput = z.infer<typeof createClassSchema>;
+export type CreateMultipleClassesInput = z.infer<typeof createMultipleClassesSchema>;
 export type UpdateClassInput = z.infer<typeof updateClassSchema>;
 
 export const DURATION_MINUTES_OPTIONS = DURATION_OPTIONS;
