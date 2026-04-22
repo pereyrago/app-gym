@@ -6,11 +6,13 @@ import {
   createStudent,
   getStudentsByTeacher,
   getStudentsByTeacherCacheTag,
+  updateStudent,
   updateStudentStatus,
+  deleteStudent,
 } from "@/repositories/students";
 import type { Student } from "@/types";
 import { createClient } from "@/lib/supabase/server";
-import { createStudentSchema } from "@/validations/student";
+import { createStudentSchema, updateStudentSchema } from "@/validations/student";
 
 export async function getMyStudentsAction(): Promise<Student[]> {
   const teacherId = await getMyTeacherId();
@@ -34,6 +36,58 @@ export async function confirmStudentAction(studentId: string, classId?: string) 
   if (classId) revalidatePath(`/teacher/classes/${classId}`);
 }
 
+export async function updateStudentAction(studentId: string, input: unknown) {
+  const teacherId = await getMyTeacherId();
+  if (!teacherId) throw new Error("No autorizado");
+
+  const parsed = updateStudentSchema.parse(input);
+  const supabase = await createClient();
+
+  const { data: allowed } = await supabase.rpc("teacher_can_use_student", {
+    p_teacher_id: teacherId,
+    p_student_id: studentId,
+  });
+  if (!allowed) throw new Error("No tienes permiso para editar este alumno");
+
+  const dniTrim = parsed.dni?.trim();
+  const dniForDb = dniTrim === "" ? null : dniTrim;
+
+  await updateStudent(studentId, {
+    full_name: parsed.full_name?.trim(),
+    dni: dniForDb,
+    email: parsed.email?.trim() || null,
+    phone: parsed.phone?.trim(),
+    emergency_contact_phone: parsed.emergency_contact_phone?.trim() || null,
+    apto_fisico: parsed.apto_fisico ?? null,
+  });
+
+  revalidateStudentsCache(teacherId);
+  revalidatePath("/teacher/students");
+  revalidatePath(`/teacher/students/${studentId}`);
+}
+
+export async function deleteStudentAction(studentId: string) {
+  const teacherId = await getMyTeacherId();
+  if (!teacherId) throw new Error("No autorizado");
+
+  const supabase = await createClient();
+  const { data: student } = await supabase
+    .from("students")
+    .select("teacher_id")
+    .eq("id", studentId)
+    .single();
+
+  if (!student || student.teacher_id !== teacherId) {
+    throw new Error("Solo el profesor titular puede eliminar al alumno");
+  }
+
+  await deleteStudent(studentId);
+
+  revalidateStudentsCache(teacherId);
+  revalidatePath("/teacher/students");
+  revalidatePath("/teacher");
+}
+
 export async function rejectStudentAction(studentId: string, classId?: string) {
   const teacherId = await getMyTeacherId();
   if (!teacherId) throw new Error("No autorizado");
@@ -50,8 +104,6 @@ export async function rejectStudentAction(studentId: string, classId?: string) {
   const { error: attErr } = await attendanceDelete;
   if (attErr) throw attErr;
 
-  // El profesor NO elimina alumnos globalmente: eso queda solo para admin.
-  // Si el alumno es propio, puede marcarlo como rechazado en su base.
   if (student.teacher_id === teacherId) {
     await updateStudentStatus(studentId, "rejected");
   }

@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  createClassSchema,
-  type CreateClassInput,
+  createMultipleClassesSchema,
+  type CreateMultipleClassesInput,
   DURATION_MINUTES_OPTIONS,
 } from "@/validations/class";
 import { createClassAction } from "@/app/teacher/classes/actions";
@@ -49,11 +49,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Info, PlusCircle, Plus, ChevronRight, Loader2, Search, X } from "lucide-react";
+import { Info, PlusCircle, Plus, ChevronRight, Loader2, Search, X, CalendarIcon } from "lucide-react";
 import type { ClassType } from "@/types";
 import type { Period } from "@/types";
 import type { Student } from "@/types";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
 
 function normalizeName(s: string): string {
   return s
@@ -97,11 +101,11 @@ export function CreateClassDialog({
     return students.filter((s) => normalizeName(s.full_name).includes(q));
   }, [students, searchStep2]);
 
-  const form = useForm<CreateClassInput>({
-    resolver: zodResolver(createClassSchema),
+  const form = useForm<CreateMultipleClassesInput>({
+    resolver: zodResolver(createMultipleClassesSchema),
     defaultValues: {
       class_type_id: "",
-      class_date: "",
+      class_dates: [],
       start_time: "09:00",
       duration_minutes: 60,
     },
@@ -115,7 +119,7 @@ export function CreateClassDialog({
       setSearchStep2("");
       setIsSharedMode(false);
       isSharedModeRef.current = false;
-      form.reset({ class_type_id: "", class_date: "", start_time: "09:00", duration_minutes: 60 });
+      form.reset({ class_type_id: "", class_dates: [], start_time: "09:00", duration_minutes: 60 });
     }
   }, [open, form]);
 
@@ -163,8 +167,11 @@ export function CreateClassDialog({
     setGroupSelectNonce((n) => n + 1);
   }
 
-  function onSubmitStep1() {
-    setStep(2);
+  async function onSubmitStep1() {
+    const valid = await form.trigger(["class_type_id", "class_dates", "start_time", "duration_minutes"]);
+    if (valid) {
+      setStep(2);
+    }
   }
 
   function toggleStudent(id: string) {
@@ -189,7 +196,7 @@ export function CreateClassDialog({
         teacher_id: teacherId,
         student_ids: Array.from(selectedStudentIds),
       });
-      toast({ title: "Clase creada" });
+      toast({ title: values.class_dates.length > 1 ? "Clases creadas" : "Clase creada" });
       setOpen(false);
     } catch (e) {
       toast({
@@ -207,6 +214,8 @@ export function CreateClassDialog({
   }
 
   const canCreate = currentPeriod !== null && classTypes.length > 0;
+
+  const selectedDates = form.watch("class_dates");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -239,7 +248,7 @@ export function CreateClassDialog({
           <DialogTitle>{step === 1 ? "Crear clase" : "Seleccionar asistentes"}</DialogTitle>
           <DialogDescription id="create-class-desc">
             {step === 1
-              ? "Podés editar o cancelar la clase desde su ficha cuando lo necesites."
+              ? "Podés seleccionar varias fechas para crear varias clases de una vez."
               : isSharedMode
                 ? "Selecciona todos los alumnos que asisten a esta clase compartida."
                 : "Clase individual (1:1). Selecciona el alumno o agrega más para clase compartida."}
@@ -287,14 +296,68 @@ export function CreateClassDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="class_date"
+                      name="class_dates"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Fecha</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Fechas</FormLabel>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-full pl-3 text-left font-normal",
+                                    !field.value?.length && "text-muted-foreground"
+                                  )}
+                                >
+                                  {field.value?.length > 0 ? (
+                                    field.value.length === 1 ? (
+                                      format(parseISO(field.value[0]), "PPP", { locale: es })
+                                    ) : (
+                                      `${field.value.length} fechas seleccionadas`
+                                    )
+                                  ) : (
+                                    <span>Seleccionar fechas</span>
+                                  )}
+                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="multiple"
+                                selected={(field.value || []).map(d => parseISO(d))}
+                                onSelect={(dates) => {
+                                  const dateStrings = (dates || []).map(d => format(d, "yyyy-MM-dd"));
+                                  field.onChange(dateStrings);
+                                }}
+                                disabled={(date) =>
+                                  date < new Date("1900-01-01")
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                           <FormMessage />
+                          {(field.value || []).length > 1 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {[...(field.value || [])].sort().map(d => (
+                                <Badge key={d} variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  {format(parseISO(d), "dd/MM", { locale: es })}
+                                  <button
+                                    type="button"
+                                    className="ml-1 hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      field.onChange(field.value.filter(v => v !== d));
+                                    }}
+                                  >
+                                    <X className="h-2 w-2" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </FormItem>
                       )}
                     />
@@ -393,7 +456,7 @@ export function CreateClassDialog({
                     </Button>
                   )}
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                   {groups.length > 0 && (
                     <div className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-[240px]">
                       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

@@ -12,12 +12,20 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, ArrowUpDown, Phone, Info } from "lucide-react";
+import { Search, ArrowUpDown, Info, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import type { Student } from "@/types";
 import type { StudentsSortBy, StudentsSortOrder } from "@/repositories/students";
-import { digitsOnly, whatsappUrl } from "@/lib/whatsapp-url";
+import { whatsappUrl } from "@/lib/whatsapp-url";
 import { WhatsAppBrandIcon } from "@/components/icons/whatsapp-brand-icon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { EditStudentDialog } from "./edit-student-dialog";
+import { deleteStudentAction } from "@/app/teacher/students/actions";
+import { useToast } from "@/hooks/use-toast";
 
 const DEBOUNCE_MS = 400;
 
@@ -26,50 +34,6 @@ interface StudentsTableProps {
   search: string;
   sortBy: StudentsSortBy;
   sortOrder: StudentsSortOrder;
-}
-
-function PhoneRow({ label, value }: { label: string; value: string | null }) {
-  if (!value || !value.trim()) {
-    return (
-      <div>
-        <p className="text-[12px] font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm">—</p>
-      </div>
-    );
-  }
-  const telHref = "tel:" + value.trim().replace(/\s/g, "");
-  const waHref = whatsappUrl(value);
-  return (
-    <div>
-      <p className="text-[12px] font-medium text-muted-foreground">{label}</p>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <span className="text-sm">{value.trim()}</span>
-        <span className="flex gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-            <a href={telHref} aria-label="Llamar" title="Llamar">
-              <Phone className="h-4 w-4" />
-            </a>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-[#25D366] hover:text-[#25D366]"
-            asChild
-          >
-            <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="WhatsApp"
-              title="WhatsApp"
-            >
-              <WhatsAppBrandIcon />
-            </a>
-          </Button>
-        </span>
-      </div>
-    </div>
-  );
 }
 
 function buildSearchParams(
@@ -92,7 +56,11 @@ export function StudentsTable({
 }: StudentsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { toast } = useToast();
   const [searchInput, setSearchInput] = useState(searchFromUrl);
+  
+  // Estado para controlar el diálogo de edición
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   useEffect(() => {
     setSearchInput(searchFromUrl);
@@ -117,6 +85,23 @@ export function StudentsTable({
     },
     [sortBy, sortOrder, searchInput, pathname, router]
   );
+
+  async function handleDelete(student: Student) {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar a ${student.full_name}?`)) {
+      return;
+    }
+
+    try {
+      await deleteStudentAction(student.id);
+      toast({ title: "Alumno eliminado correctamente" });
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudo eliminar el alumno",
+        variant: "destructive",
+      });
+    }
+  }
 
   const isEmpty = students.length === 0;
   const hasSearch = searchFromUrl.trim().length > 0;
@@ -204,6 +189,7 @@ export function StudentsTable({
                     </Button>
                   </div>
                 </TableHead>
+                <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -235,6 +221,29 @@ export function StudentsTable({
                         <span className="text-[12px] text-muted-foreground">Activo</span>
                       )}
                     </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                            <span className="sr-only">Acciones</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setEditingStudent(s)}>
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleDelete(s)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Eliminar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -247,6 +256,14 @@ export function StudentsTable({
           </p>
         )}
       </div>
+
+      {editingStudent && (
+        <EditStudentDialog
+          student={editingStudent}
+          open={!!editingStudent}
+          onOpenChange={(open) => !open && setEditingStudent(null)}
+        />
+      )}
     </>
   );
 }

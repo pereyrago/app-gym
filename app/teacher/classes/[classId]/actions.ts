@@ -8,6 +8,48 @@ import {
   setClassAbsences,
   clearClassAbsences,
 } from "@/repositories/attendances";
+
+export async function deleteClassAction(classId: string) {
+  const teacherId = await getMyTeacherId();
+  if (!teacherId) throw new Error("No autorizado");
+
+  const classRow = await getClassById(classId);
+  const row = classRow as { teacher_id: string } | null;
+  if (!row || row.teacher_id !== teacherId) {
+    throw new Error("No autorizado");
+  }
+
+  const { deleteClass } = await import("@/services/class.service");
+  await deleteClass(classId);
+
+  revalidatePath("/teacher/classes");
+  revalidatePath("/teacher");
+}
+
+export async function updateClassAction(
+  classId: string,
+  input: {
+    class_type_id?: string;
+    class_date?: string;
+    start_time?: string;
+    duration_minutes?: number;
+  }
+) {
+  const teacherId = await getMyTeacherId();
+  if (!teacherId) throw new Error("No autorizado");
+
+  const classRow = await getClassById(classId);
+  const row = classRow as { teacher_id: string } | null;
+  if (!row || row.teacher_id !== teacherId) throw new Error("No autorizado");
+
+  const { updateClass } = await import("@/services/class.service");
+  await updateClass(classId, input);
+
+  revalidatePath(`/teacher/classes/${classId}`);
+  revalidatePath("/teacher/classes");
+  revalidatePath("/teacher");
+}
+
 export async function setAttendancesAction(classId: string, studentIds: string[]) {
   const teacherId = await getMyTeacherId();
   if (!teacherId) throw new Error("No autorizado");
@@ -175,7 +217,6 @@ export async function updateClassStatusAction(
   revalidatePath("/teacher");
 }
 
-/** Cancela la clase por el profesor: motivo obligatorio, se vacían asistencias y no se registran faltas a los alumnos. */
 export async function cancelClassByTeacherAction(
   classId: string,
   input: {
