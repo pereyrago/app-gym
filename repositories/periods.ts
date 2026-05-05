@@ -20,19 +20,24 @@ export async function getPeriodById(periodId: string) {
   return data as Period;
 }
 
-/** Período actual: aquel cuya fecha de hoy está entre start_date y end_date. */
-export async function getCurrentPeriod(): Promise<Period | null> {
+/** Busca el período que corresponde a una fecha específica. */
+export async function getPeriodForDate(date: string): Promise<Period | null> {
   const supabase = await createClient();
-  const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("periods")
     .select("*")
-    .lte("start_date", today)
-    .gte("end_date", today)
+    .lte("start_date", date)
+    .gte("end_date", date)
     .order("start_date", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) throw error;
   return data as Period | null;
+}
+
+/** Período actual: aquel cuya fecha de hoy está entre start_date y end_date. */
+export async function getCurrentPeriod(): Promise<Period | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  return getPeriodForDate(today);
 }

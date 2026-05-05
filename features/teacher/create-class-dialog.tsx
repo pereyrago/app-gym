@@ -213,7 +213,7 @@ export function CreateClassDialog({
     setOpen(false);
   }
 
-  const canCreate = currentPeriod !== null && classTypes.length > 0;
+  const canCreate = classTypes.length > 0;
 
   const selectedDates = form.watch("class_dates");
 
@@ -257,23 +257,22 @@ export function CreateClassDialog({
 
         {step === 1 && (
           <>
-            {!currentPeriod ? (
-              <p className="text-[13px] text-muted-foreground">
-                No hay período activo. El administrador debe crear un período cuya fecha actual esté
-                entre inicio y fin.
-              </p>
-            ) : (
-              <>
-                <div className="rounded border border-border/80 bg-muted/30 px-3 py-2 text-[13px]">
-                  <span className="font-medium text-muted-foreground">Período actual: </span>
-                  {currentPeriod.name}
-                </div>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmitStep1)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="class_type_id"
-                      render={({ field }) => (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmitStep1)} className="space-y-4">
+                {currentPeriod ? (
+                  <div className="rounded border border-border/80 bg-muted/30 px-3 py-2 text-[13px]">
+                    <span className="font-medium text-muted-foreground">Período sugerido: </span>
+                    {currentPeriod.name}
+                  </div>
+                ) : (
+                  <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-400">
+                    <span className="font-semibold">Nota:</span> No hay un período activo para hoy. Asegúrate de que las fechas que elijas tengan un período creado por el admin.
+                  </div>
+                )}
+                <FormField
+                  control={form.control}
+                  name="class_type_id"
+                  render={({ field }) => (
                         <FormItem>
                           <FormLabel>Tipo de clase</FormLabel>
                           <Select value={field.value} onValueChange={field.onChange}>
@@ -421,9 +420,6 @@ export function CreateClassDialog({
                 </Form>
               </>
             )}
-          </>
-        )}
-
         {step === 2 && (
           <>
             {loadingStudents ? (

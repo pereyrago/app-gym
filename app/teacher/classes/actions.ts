@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getMyTeacherId } from "@/lib/teacher";
-import { getCurrentPeriod } from "@/repositories/periods";
+import { getPeriodForDate } from "@/repositories/periods";
 import { createClass } from "@/services/class.service";
 import { setClassAttendances } from "@/repositories/attendances";
 import type { ClassScope } from "@/types/database.types";
@@ -20,10 +20,7 @@ export async function createClassAction(input: {
   if (!myTeacherId || myTeacherId !== input.teacher_id) {
     throw new Error("No autorizado");
   }
-  const currentPeriod = await getCurrentPeriod();
-  if (!currentPeriod) {
-    throw new Error("No hay período activo. El administrador debe crear un período vigente.");
-  }
+
   if (input.class_dates.length === 0) {
     throw new Error("Debe seleccionar al menos una fecha.");
   }
@@ -33,9 +30,14 @@ export async function createClassAction(input: {
   const createdIds: string[] = [];
 
   for (const date of input.class_dates) {
+    const period = await getPeriodForDate(date);
+    if (!period) {
+      throw new Error(`No existe un período para la fecha ${date}. Pide al administrador que lo cree.`);
+    }
+
     const created = await createClass({
       teacher_id: input.teacher_id,
-      period_id: currentPeriod.id,
+      period_id: period.id,
       class_type_id: input.class_type_id,
       class_date: date,
       start_time: input.start_time,
