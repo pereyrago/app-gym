@@ -87,10 +87,6 @@ export function CreateClassDialog({
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchStep2, setSearchStep2] = useState("");
-  /** false = 1:1 (un solo alumno); true = clase compartida (varios) */
-  const [isSharedMode, setIsSharedMode] = useState(false);
-  /** Espejo síncrono de `isSharedMode` para lógica en handlers (evita closures viejos). */
-  const isSharedModeRef = useRef(false);
   const [groups, setGroups] = useState<TeacherStudentGroupWithStudents[]>([]);
   const [groupSelectNonce, setGroupSelectNonce] = useState(0);
   const { toast } = useToast();
@@ -117,15 +113,9 @@ export function CreateClassDialog({
       setSelectedStudentIds(new Set());
       setStudents([]);
       setSearchStep2("");
-      setIsSharedMode(false);
-      isSharedModeRef.current = false;
       form.reset({ class_type_id: "", class_dates: [], start_time: "09:00", duration_minutes: 60 });
     }
   }, [open, form]);
-
-  useEffect(() => {
-    isSharedModeRef.current = isSharedMode;
-  }, [isSharedMode]);
 
   useEffect(() => {
     if (open && step === 2) {
@@ -152,18 +142,7 @@ export function CreateClassDialog({
       });
       return;
     }
-    if (ids.length > 1) {
-      isSharedModeRef.current = true;
-      setIsSharedMode(true);
-      setSelectedStudentIds((prev) => new Set([...prev, ...ids]));
-    } else {
-      const only = ids[0];
-      setSelectedStudentIds((prev) => {
-        const append = isSharedModeRef.current || prev.size > 1;
-        if (append) return new Set([...prev, only]);
-        return new Set([only]);
-      });
-    }
+    setSelectedStudentIds((prev) => new Set([...prev, ...ids]));
     setGroupSelectNonce((n) => n + 1);
   }
 
@@ -178,8 +157,7 @@ export function CreateClassDialog({
     setSelectedStudentIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else if (isSharedModeRef.current) next.add(id);
-      else return new Set([id]); // 1:1: solo uno seleccionado
+      else next.add(id);
       return next;
     });
   }
@@ -249,13 +227,11 @@ export function CreateClassDialog({
           <DialogDescription id="create-class-desc">
             {step === 1
               ? "Podés seleccionar varias fechas para crear varias clases de una vez."
-              : isSharedMode
-                ? "Selecciona todos los alumnos que asisten a esta clase compartida."
-                : "Clase individual (1:1). Selecciona el alumno o agrega más para clase compartida."}
+              : "Selecciona los alumnos que asisten a la clase."}
           </DialogDescription>
-        </DialogHeader>
+          </DialogHeader>
 
-        {step === 1 && (
+          {step === 1 && (
           <>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmitStep1)} className="space-y-4">
@@ -273,154 +249,155 @@ export function CreateClassDialog({
                   control={form.control}
                   name="class_type_id"
                   render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tipo de clase</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar tipo" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {classTypes.map((ct) => (
-                                <SelectItem key={ct.id} value={ct.id}>
-                                  {ct.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="class_dates"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                          <FormLabel>Fechas</FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full pl-3 text-left font-normal",
-                                    !field.value?.length && "text-muted-foreground"
-                                  )}
-                                >
-                                  {field.value?.length > 0 ? (
-                                    field.value.length === 1 ? (
-                                      format(parseISO(field.value[0]), "PPP", { locale: es })
-                                    ) : (
-                                      `${field.value.length} fechas seleccionadas`
-                                    )
-                                  ) : (
-                                    <span>Seleccionar fechas</span>
-                                  )}
-                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="multiple"
-                                selected={(field.value || []).map(d => parseISO(d))}
-                                onSelect={(dates) => {
-                                  const dateStrings = (dates || []).map(d => format(d, "yyyy-MM-dd"));
-                                  field.onChange(dateStrings);
-                                }}
-                                disabled={(date) =>
-                                  date < new Date("1900-01-01")
-                                }
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                          {(field.value || []).length > 1 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {[...(field.value || [])].sort().map(d => (
-                                <Badge key={d} variant="secondary" className="text-[10px] px-1.5 py-0">
-                                  {format(parseISO(d), "dd/MM", { locale: es })}
-                                  <button
-                                    type="button"
-                                    className="ml-1 hover:text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      field.onChange(field.value.filter(v => v !== d));
-                                    }}
-                                  >
-                                    <X className="h-2 w-2" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="start_time"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Hora de inicio</FormLabel>
+                    <FormItem>
+                      <FormLabel>Tipo de clase</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar tipo" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {classTypes.map((ct) => (
+                            <SelectItem key={ct.id} value={ct.id}>
+                              {ct.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="class_dates"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Fechas</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
                           <FormControl>
-                            <Input
-                              type="time"
-                              value={field.value ?? "09:00"}
-                              onChange={field.onChange}
-                              onBlur={field.onBlur}
-                              ref={field.ref}
-                              name={field.name}
-                              aria-label="Hora de inicio de la clase"
-                            />
+                            <Button
+                              variant={"outline"}
+                              className={cn(
+                                "w-full pl-3 text-left font-normal",
+                                !field.value?.length && "text-muted-foreground"
+                              )}
+                            >
+                              {field.value?.length > 0 ? (
+                                field.value.length === 1 ? (
+                                  format(parseISO(field.value[0]), "PPP", { locale: es })
+                                ) : (
+                                  `${field.value.length} fechas seleccionadas`
+                                )
+                              ) : (
+                                <span>Seleccionar fechas</span>
+                              )}
+                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="multiple"
+                            selected={(field.value || []).map(d => parseISO(d))}
+                            onSelect={(dates) => {
+                              const dateStrings = (dates || []).map(d => format(d, "yyyy-MM-dd"));
+                              field.onChange(dateStrings);
+                            }}
+                            disabled={(date) =>
+                              date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                      {(field.value || []).length > 1 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {[...(field.value || [])].sort().map(d => (
+                            <Badge key={d} variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {format(parseISO(d), "dd/MM", { locale: es })}
+                              <button
+                                type="button"
+                                className="ml-1 hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  field.onChange(field.value.filter(v => v !== d));
+                                }}
+                              >
+                                <X className="h-2 w-2" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
                       )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="duration_minutes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Duración (minutos)</FormLabel>
-                          <Select
-                            value={field.value?.toString() ?? ""}
-                            onValueChange={(v) => field.onChange(Number(v))}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Seleccionar duración" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {DURATION_MINUTES_OPTIONS.map((m) => (
-                                <SelectItem key={m} value={m.toString()}>
-                                  {m} min
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                        Cancelar
-                      </Button>
-                      <Button type="submit" variant="secondary">
-                        Siguiente
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </>
-            )}
-        {step === 2 && (
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="start_time"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hora de inicio</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="time"
+                          value={field.value ?? "09:00"}
+                          onChange={field.onChange}
+                          onBlur={field.onBlur}
+                          ref={field.ref}
+                          name={field.name}
+                          aria-label="Hora de inicio de la clase"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="duration_minutes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duración (minutos)</FormLabel>
+                      <Select
+                        value={field.value?.toString() ?? ""}
+                        onValueChange={(v) => field.onChange(Number(v))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Seleccionar duración" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {DURATION_MINUTES_OPTIONS.map((m) => (
+                            <SelectItem key={m} value={m.toString()}>
+                              {m} min
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" variant="secondary">
+                    Siguiente
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </>
+          )}
+
+          {step === 2 && (
           <>
             {loadingStudents ? (
               <div className="flex items-center justify-center py-8">
@@ -433,25 +410,9 @@ export function CreateClassDialog({
             ) : (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-sm font-medium">
-                    {isSharedMode ? "Alumnos de la clase compartida" : "Alumno (1:1)"}
-                  </h2>
-                  {!isSharedMode && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 gap-1.5 text-[12px]"
-                      onClick={() => {
-                        isSharedModeRef.current = true;
-                        setIsSharedMode(true);
-                      }}
-                    >
-                      <PlusCircle className="h-3.5 w-3.5" />
-                      Agregar alumnos
-                    </Button>
-                  )}
+                  <h2 className="text-sm font-medium">Alumnos</h2>
                 </div>
+
                 <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
                   {groups.length > 0 && (
                     <div className="flex min-w-0 flex-1 flex-col gap-1 sm:max-w-[240px]">
