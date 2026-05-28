@@ -69,7 +69,9 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
   const [newDni, setNewDni] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [activeOptionIndex, setActiveOptionIndex] = useState(-1);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listboxId = "public-student-listbox";
 
   useEffect(() => {
     const s = getStoredNames();
@@ -114,6 +116,43 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
     isNewStudent && newFullName.trim().length > 0 && newPhone.trim().length > 0;
   const hasChosenStudent = selectedStudent !== null || hasNewStudentData;
   const canSubmit = Boolean(classId && hasChosenStudent);
+
+  const showRegisterOption =
+    nameQuery.trim().length >= 2 && !loadingSuggestions && suggestions.length === 0;
+  const showListbox =
+    !selectedStudent &&
+    (suggestions.length > 0 || showRegisterOption);
+  const optionCount = suggestions.length + (showRegisterOption ? 1 : 0);
+
+  function selectOption(index: number) {
+    if (index < 0 || index >= optionCount) return;
+    if (index < suggestions.length) {
+      const s = suggestions[index]!;
+      setSelectedStudent(s);
+      setNameQuery(s.full_name);
+      setSuggestions([]);
+    } else {
+      handleChooseRegister();
+    }
+    setActiveOptionIndex(-1);
+  }
+
+  function handleNameKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showListbox || optionCount === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveOptionIndex((i) => (i + 1) % optionCount);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveOptionIndex((i) => (i <= 0 ? optionCount - 1 : i - 1));
+    } else if (e.key === "Enter" && activeOptionIndex >= 0) {
+      e.preventDefault();
+      selectOption(activeOptionIndex);
+    } else if (e.key === "Escape") {
+      setActiveOptionIndex(-1);
+      setSuggestions([]);
+    }
+  }
 
   function handleChooseRegister() {
     setNewFullName(nameQuery.trim());
@@ -236,42 +275,46 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
                 onChange={(e) => {
                   setNameQuery(e.target.value);
                   setSelectedStudent(null);
+                  setActiveOptionIndex(-1);
                 }}
+                onKeyDown={handleNameKeyDown}
+                role="combobox"
+                aria-expanded={showListbox}
+                aria-controls={showListbox ? listboxId : undefined}
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  activeOptionIndex >= 0 ? `${listboxId}-option-${activeOptionIndex}` : undefined
+                }
                 autoComplete="off"
                 className="pr-8"
               />
               {loadingSuggestions && (
                 <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
               )}
-              {!selectedStudent &&
-                (suggestions.length > 0 ||
-                  (nameQuery.trim().length >= 2 && !loadingSuggestions)) && (
+              {showListbox && (
                   <ul
+                    id={listboxId}
                     className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-border bg-background py-1 text-sm shadow-md"
                     role="listbox"
                   >
-                    {suggestions.map((s) => (
+                    {suggestions.map((s, index) => (
                       <li
                         key={s.id}
+                        id={`${listboxId}-option-${index}`}
                         role="option"
-                        aria-selected={false}
-                        className="cursor-pointer px-3 py-2 hover:bg-accent"
-                        onMouseDown={() => {
-                          setSelectedStudent(s);
-                          setNameQuery(s.full_name);
-                          setSuggestions([]);
-                        }}
+                        aria-selected={activeOptionIndex === index}
+                        className={`cursor-pointer px-3 py-2 ${activeOptionIndex === index ? "bg-accent" : "hover:bg-accent"}`}
+                        onMouseDown={() => selectOption(index)}
                       >
                         <span className="capitalize">{s.full_name}</span>
                       </li>
                     ))}
-                    {nameQuery.trim().length >= 2 &&
-                      !loadingSuggestions &&
-                      suggestions.length === 0 && (
+                    {showRegisterOption && (
                         <li
+                          id={`${listboxId}-option-${suggestions.length}`}
                           role="option"
-                          aria-selected={false}
-                          className="cursor-pointer border-t border-border px-3 py-2 font-medium text-primary hover:bg-accent"
+                          aria-selected={activeOptionIndex === suggestions.length}
+                          className={`cursor-pointer border-t border-border px-3 py-2 font-medium text-primary ${activeOptionIndex === suggestions.length ? "bg-accent" : "hover:bg-accent"}`}
                           onMouseDown={handleChooseRegister}
                         >
                           No estoy en la lista — Registrate
@@ -336,6 +379,7 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 autoComplete="email"
+                spellCheck={false}
               />
             </div>
           </div>
@@ -344,6 +388,8 @@ export function PublicAttendanceForm({ slug, classes }: PublicAttendanceFormProp
 
       {message && (
         <p
+          role="status"
+          aria-live="polite"
           className={
             message.type === "error"
               ? "text-sm text-destructive"

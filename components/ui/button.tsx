@@ -10,20 +10,20 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        tertiary: "bg-tertiary text-tertiary-foreground shadow-sm hover:bg-tertiary/90",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-slate-900 hover:bg-secondary/90 hover:text-slate-950 dark:text-slate-900 dark:hover:text-slate-950",
+        tertiary: "bg-tertiary text-tertiary-foreground hover:bg-tertiary/90",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3 text-xs",
-        lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        default: "h-control min-h-control px-3 py-2 text-sm sm:min-h-control",
+        sm: "h-7 min-h-7 rounded-control px-2.5 text-ui-sm",
+        lg: "h-10 min-h-touch-control rounded-md px-6 text-sm sm:min-h-control",
+        icon: "h-control w-8 min-h-control min-w-8 sm:min-h-control",
       },
     },
     defaultVariants: {

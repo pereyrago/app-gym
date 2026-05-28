@@ -104,7 +104,12 @@ export function CreateTeacherDialog() {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="juan@ejemplo.com" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="juan@ejemplo.com"
+                      spellCheck={false}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

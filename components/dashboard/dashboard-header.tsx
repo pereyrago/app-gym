@@ -9,7 +9,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   return (
     <div className="space-y-1">
-      <h1 className="text-xl font-semibold tracking-tight md:text-2xl">{title}</h1>
+      <h1 className="text-pretty text-lg font-semibold tracking-tight">{title}</h1>
       <p className="text-[13px] text-muted-foreground">{description}</p>
     </div>
   );

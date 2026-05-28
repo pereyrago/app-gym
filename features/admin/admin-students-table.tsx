@@ -85,20 +85,16 @@ export function AdminStudentsTable({ students }: AdminStudentsTableProps) {
           </TableHeader>
           <TableBody>
             {students.map((s) => (
-              <TableRow
-                key={s.id}
-                className="cursor-pointer"
-                role="button"
-                tabIndex={0}
-                onClick={() => setDetail(s)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setDetail(s);
-                  }
-                }}
-              >
-                <TableCell className="font-medium capitalize">{s.full_name}</TableCell>
+              <TableRow key={s.id}>
+                <TableCell className="font-medium capitalize">
+                  <button
+                    type="button"
+                    className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                    onClick={() => setDetail(s)}
+                  >
+                    {s.full_name}
+                  </button>
+                </TableCell>
                 <TableCell className="max-w-[220px] truncate text-[13px]">
                   {teacherAddedLabel(s)}
                 </TableCell>

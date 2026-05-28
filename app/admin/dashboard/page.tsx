@@ -137,7 +137,7 @@ export default async function AdminDashboardPage({
   const classTypeOptions = classTypes.map((ct) => ({ id: ct.id, name: ct.name }));
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
+    <div className="mx-auto w-full max-w-5xl space-y-6">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="shrink-0" asChild>
           <Link href="/admin" aria-label="Volver al inicio">
@@ -156,7 +156,8 @@ export default async function AdminDashboardPage({
         />
       </Suspense>
 
-      <DashboardTabsContent
+      <Suspense fallback={<Skeleton className="h-96 w-full rounded-lg" />}>
+        <DashboardTabsContent
         kpis={kpis}
         classesByDay={classesByDay}
         attendanceByDay={attendanceByDay}
@@ -184,7 +185,8 @@ export default async function AdminDashboardPage({
         topWeekday={topWeekday}
         topClassType={topClassType}
         topTeacherByAvg={topTeacherByAvg}
-      />
+        />
+      </Suspense>
     </div>
   );
 }

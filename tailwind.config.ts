@@ -8,6 +8,19 @@ const config = {
   ],
   theme: {
     extend: {
+      /* Design tokens — spacing base 4px: 1=4, 2=8, 3=12, 4=16, 6=24, 8=32 */
+      fontSize: {
+        ui: ["13px", { lineHeight: "1.4" }],
+        "ui-sm": ["12px", { lineHeight: "1.35" }],
+        "ui-xs": ["11px", { lineHeight: "1.3" }],
+      },
+      height: {
+        control: "2rem", /* 32px — compact buttons/inputs */
+      },
+      minHeight: {
+        control: "2rem",
+        "touch-control": "2.75rem", /* 44px — teacher/public mobile */
+      },
       colors: {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -58,6 +71,8 @@ const config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        card: "6px",
+        control: "4px",
       },
     },
   },

@@ -10,8 +10,15 @@ export default async function TeacherLayout({ children }: { children: React.Reac
 
   return (
     <div className="flex min-h-screen flex-col">
+      <a href="#main-content" className="skip-link">
+        Saltar al contenido
+      </a>
       <TeacherNav />
-      <main className="flex-1 overflow-auto p-3 md:p-4 scrollbar-thin">
+      <main
+        id="main-content"
+        className="flex-1 overflow-auto p-3 md:p-4 scrollbar-thin"
+        tabIndex={-1}
+      >
         <div className="mx-auto w-full max-w-2xl">{children}</div>
       </main>
     </div>

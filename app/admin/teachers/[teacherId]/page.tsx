@@ -55,7 +55,9 @@ export default async function AdminTeacherDetailPage({ params, searchParams }: P
             Volver a profesores
           </Link>
         </Button>
-        <h1 className="text-2xl font-bold tracking-tight">Clases de {teacherName}</h1>
+        <h1 className="text-pretty text-lg font-semibold tracking-tight">
+          Clases de {teacherName}
+        </h1>
       </div>
       <TeacherClassesView
         teacherId={teacherId}

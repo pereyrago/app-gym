@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import {
   Table,
@@ -121,7 +122,7 @@ export function StudentsTable({
           <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar por nombre o teléfono..."
+            placeholder="Buscar por nombre o teléfono…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="h-9 w-full min-w-0 pl-10 pr-3"
@@ -196,20 +197,15 @@ export function StudentsTable({
               {students.map((s) => {
                 const pending = s.status === "to_confirm";
                 return (
-                  <TableRow
-                    key={s.id}
-                    className="cursor-pointer"
-                    onClick={() => router.push(`/teacher/students/${s.id}`)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        router.push(`/teacher/students/${s.id}`);
-                      }
-                    }}
-                  >
-                    <TableCell className="font-medium capitalize">{s.full_name}</TableCell>
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium capitalize">
+                      <Link
+                        href={`/teacher/students/${s.id}`}
+                        className="block hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                      >
+                        {s.full_name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{s.phone ?? "—"}</TableCell>
                     <TableCell className="text-center">
                       {pending ? (

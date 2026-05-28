@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -26,6 +26,7 @@ export function LoginForm() {
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const authErrorShown = useRef(false);
 
   const form = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
@@ -76,14 +77,15 @@ export function LoginForm() {
     }
   }
 
-  const error = searchParams.get("error");
-  if (error === "auth") {
+  useEffect(() => {
+    if (searchParams.get("error") !== "auth" || authErrorShown.current) return;
+    authErrorShown.current = true;
     toast({
       title: "Error de autenticación",
       description: "No se pudo completar el inicio de sesión.",
       variant: "destructive",
     });
-  }
+  }, [searchParams, toast]);
 
   return (
     <Card className="w-full max-w-md border-border/80 bg-card">
@@ -112,8 +114,9 @@ export function LoginForm() {
                     <Input
                       id="email"
                       type="email"
-                      placeholder="tu@email.com"
+                      placeholder="tu@email.com…"
                       autoComplete="email"
+                      spellCheck={false}
                       {...field}
                     />
                   </FormControl>
@@ -132,6 +135,7 @@ export function LoginForm() {
                       id="password"
                       type="password"
                       autoComplete="current-password"
+                      spellCheck={false}
                       {...field}
                     />
                   </FormControl>
