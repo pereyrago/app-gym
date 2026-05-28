@@ -2,6 +2,7 @@
 
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { buildStudentNamesByClassId, type StudentEmbed } from "@/lib/teacher-report";
 import type { TeacherReportRow, AllTeachersReportRow } from "@/lib/pdf";
 import type { StudentAttendanceReportRow } from "@/lib/pdf";
 
@@ -52,35 +53,42 @@ export async function getReportDataForTeacher(
     return { teacherName, periodName, classes: [] };
   }
 
-  const classesWithAttendances = await Promise.all(
-    classes.map(async (c) => {
-      const { data: attendances } = await supabase
-        .from("class_attendances")
-        .select("students!inner(full_name, status, deleted_at)")
-        .eq("class_id", c.id)
-        .is("students.deleted_at", null)
-        .eq("students.status", "active");
+  const classIds = classes.map((c) => c.id);
+  const { data: attendanceRows, error: attError } = await supabase
+    .from("class_attendances")
+    .select("class_id, student_id")
+    .in("class_id", classIds);
 
-      const studentNames = (attendances ?? [])
-        .map(
-          (a) =>
-            (
-              a as unknown as {
-                students: { full_name: string; status: string; deleted_at: string | null } | null;
-              }
-            ).students?.full_name
-        )
-        .filter(Boolean) as string[];
-      return {
-        classTypeName: c.class_types?.name ?? "Clase",
-        class_date: c.class_date,
-        start_time: c.start_time,
-        duration_minutes: c.duration_minutes,
-        attendancesCount: studentNames.length,
-        studentNames,
-      };
-    })
-  );
+  if (attError) throw attError;
+
+  const links = (attendanceRows ?? []) as { class_id: string; student_id: string }[];
+  const studentIds = [...new Set(links.map((a) => a.student_id))];
+
+  let studentsById = new Map<string, StudentEmbed>();
+  if (studentIds.length > 0) {
+    const { data: studentRows, error: stError } = await supabase
+      .from("students")
+      .select("id, full_name, email, status, deleted_at")
+      .in("id", studentIds);
+    if (stError) throw stError;
+    studentsById = new Map(
+      ((studentRows ?? []) as Array<StudentEmbed & { id: string }>).map((s) => [s.id, s])
+    );
+  }
+
+  const namesByClass = buildStudentNamesByClassId(links, studentsById);
+
+  const classesWithAttendances = classes.map((c) => {
+    const studentNames = namesByClass.get(c.id) ?? [];
+    return {
+      classTypeName: c.class_types?.name ?? "Clase",
+      class_date: c.class_date,
+      start_time: c.start_time,
+      duration_minutes: c.duration_minutes,
+      attendancesCount: studentNames.length,
+      studentNames,
+    };
+  });
 
   return {
     teacherName,
@@ -100,57 +108,89 @@ export async function getReportDataForAllTeachers(
     .select("id, profiles:profile_id(full_name, email)");
   if (!teachers?.length) return [];
 
-  const result: AllTeachersReportRow[] = [];
-
   const teachersList = teachers as unknown as Array<{
     id: string;
     profiles: { full_name: string | null; email: string } | null;
   }>;
-  for (const t of teachersList) {
-    const profile = t.profiles;
-    const teacherName = profile?.full_name ?? profile?.email ?? "Profesor";
 
-    const { data: classesRow } = await supabase
-      .from("classes")
-      .select("id, class_date, start_time, duration_minutes, class_types(name)")
-      .eq("teacher_id", t.id)
-      .eq("period_id", periodId)
-      .order("class_date", { ascending: true })
-      .order("start_time", { ascending: true });
+  const { data: classesData, error: classesError } = await supabase
+    .from("classes")
+    .select("id, teacher_id, class_date, start_time, duration_minutes, class_types(name)")
+    .eq("period_id", periodId)
+    .order("class_date", { ascending: true })
+    .order("start_time", { ascending: true });
 
-    const classes = (classesRow ?? []) as unknown as Array<{
-      id: string;
-      class_date: string;
-      start_time: string;
-      duration_minutes: number;
-      class_types: { name: string } | null;
-    }>;
-    const withCounts = await Promise.all(
-      classes.map(async (c) => {
-        const { count } = await supabase
-          .from("class_attendances")
-          .select("students!inner(id, status, deleted_at)", { count: "exact", head: true })
-          .eq("class_id", c.id)
-          .is("students.deleted_at", null)
-          .eq("students.status", "active");
-        return {
-          classTypeName: c.class_types?.name ?? "Clase",
-          class_date: c.class_date,
-          start_time: c.start_time,
-          duration_minutes: c.duration_minutes,
-          attendancesCount: count ?? 0,
-        };
-      })
-    );
+  if (classesError) throw classesError;
 
-    result.push({
-      teacherName,
-      totalClasses: withCounts.length,
-      classes: withCounts,
-    });
+  const classes = (classesData ?? []) as unknown as Array<{
+    id: string;
+    teacher_id: string;
+    class_date: string;
+    start_time: string;
+    duration_minutes: number;
+    class_types: { name: string } | null;
+  }>;
+
+  const classIds = classes.map((c) => c.id);
+  let namesByClass = new Map<string, string[]>();
+
+  if (classIds.length > 0) {
+    const { data: attendanceRows, error: attError } = await supabase
+      .from("class_attendances")
+      .select("class_id, student_id")
+      .in("class_id", classIds);
+
+    if (attError) throw attError;
+
+    const links = (attendanceRows ?? []) as { class_id: string; student_id: string }[];
+    const studentIds = [...new Set(links.map((a) => a.student_id))];
+
+    let studentsById = new Map<string, StudentEmbed>();
+    if (studentIds.length > 0) {
+      const { data: studentRows, error: stError } = await supabase
+        .from("students")
+        .select("id, full_name, email, status, deleted_at")
+        .in("id", studentIds);
+      if (stError) throw stError;
+      studentsById = new Map(
+        ((studentRows ?? []) as Array<StudentEmbed & { id: string }>).map((s) => [s.id, s])
+      );
+    }
+
+    namesByClass = buildStudentNamesByClassId(links, studentsById);
   }
 
-  return result;
+  const classesByTeacher = new Map<string, typeof classes>();
+  for (const c of classes) {
+    const list = classesByTeacher.get(c.teacher_id) ?? [];
+    list.push(c);
+    classesByTeacher.set(c.teacher_id, list);
+  }
+
+  return teachersList.map((t) => {
+    const profile = t.profiles;
+    const teacherName = profile?.full_name?.trim()
+      ? profile.full_name
+      : (profile?.email ?? "Profesor");
+    const teacherClasses = classesByTeacher.get(t.id) ?? [];
+    const mapped = teacherClasses.map((c) => {
+      const studentNames = namesByClass.get(c.id) ?? [];
+      return {
+        classTypeName: c.class_types?.name ?? "Clase",
+        class_date: c.class_date,
+        start_time: c.start_time,
+        duration_minutes: c.duration_minutes,
+        attendancesCount: studentNames.length,
+        studentNames,
+      };
+    });
+
+    return {
+      teacherName,
+      totalClasses: mapped.length,
+      classes: mapped,
+    };
+  });
 }
 
 export async function getReportDataForStudent(

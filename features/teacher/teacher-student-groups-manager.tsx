@@ -235,7 +235,7 @@ export function TeacherStudentGroupsManager({
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar alumno..."
+                placeholder="Buscar alumno…"
                 className="h-9 pl-9"
                 aria-label="Buscar alumno"
               />

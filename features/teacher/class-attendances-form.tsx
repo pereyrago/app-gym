@@ -312,7 +312,7 @@ export function ClassAttendancesForm({
         <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 shrink-0 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Buscar por nombre..."
+          placeholder="Buscar por nombre…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-9 w-full min-w-0 pl-10 pr-3"

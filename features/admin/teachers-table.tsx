@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -31,8 +30,6 @@ interface TeachersTableProps {
 
 export function TeachersTable({ teachers }: TeachersTableProps) {
   const [resetPasswordTeacher, setResetPasswordTeacher] = useState<TeacherWithProfile | null>(null);
-  const router = useRouter();
-
   if (teachers.length === 0) {
     return (
       <div className="rounded border border-border/80 p-6 text-center text-[13px] text-muted-foreground">
@@ -59,20 +56,15 @@ export function TeachersTable({ teachers }: TeachersTableProps) {
             const fullName = profile?.full_name ?? "—";
             const role = profile?.role ?? "profesor";
             return (
-              <TableRow
-                key={teacher.id}
-                className="cursor-pointer"
-                onClick={() => router.push(`/admin/teachers/${teacher.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    router.push(`/admin/teachers/${teacher.id}`);
-                  }
-                }}
-              >
-                <TableCell className="font-medium capitalize">{fullName}</TableCell>
+              <TableRow key={teacher.id}>
+                <TableCell className="font-medium capitalize">
+                  <Link
+                    href={`/admin/teachers/${teacher.id}`}
+                    className="block hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                  >
+                    {fullName}
+                  </Link>
+                </TableCell>
                 <TableCell>{email}</TableCell>
                 <TableCell>
                   <Badge variant="secondary">{role}</Badge>

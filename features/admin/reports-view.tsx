@@ -20,6 +20,7 @@ import {
   generateAllTeachersPdf,
   generateStudentAttendancePdf,
 } from "@/lib/pdf";
+import { buildReportPdfFilename, openPdfWithFilename } from "@/lib/pdf-download";
 import { useToast } from "@/hooks/use-toast";
 import type { TeacherWithProfile } from "@/types";
 import type { Period } from "@/types";
@@ -75,7 +76,11 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
           group2StudentMultiplier: group2Multiplier,
           group3StudentMultiplier: group3Multiplier,
         });
-        window.open(url, "_blank");
+        const filename = buildReportPdfFilename(
+          data.teacherName,
+          data.periodName || selectedPeriodName
+        );
+        openPdfWithFilename(url, filename);
         toast({ title: "PDF generado" });
       }
     } catch (e) {
@@ -86,6 +91,7 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
   }, [
     teacherId,
     periodId,
+    selectedPeriodName,
     group2Multiplier,
     group3Multiplier,
     toast,
@@ -104,8 +110,15 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
     try {
       const data = await getReportDataForAllTeachers(periodId);
       if (data?.length) {
-        const url = generateAllTeachersPdf(data);
-        window.open(url, "_blank");
+        const periodName = selectedPeriodName || "Periodo";
+        const url = await generateAllTeachersPdf(
+          { periodName, teachers: data },
+          {
+            group2StudentMultiplier: group2Multiplier,
+            group3StudentMultiplier: group3Multiplier,
+          }
+        );
+        openPdfWithFilename(url, buildReportPdfFilename("todos", periodName));
         toast({ title: "PDF de todos los profesores generado" });
       } else {
         toast({ title: "No hay datos para el período seleccionado", variant: "destructive" });
@@ -115,7 +128,14 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
     } finally {
       setLoading(null);
     }
-  }, [periodId, toast, toastPdfError]);
+  }, [
+    periodId,
+    selectedPeriodName,
+    group2Multiplier,
+    group3Multiplier,
+    toast,
+    toastPdfError,
+  ]);
 
   const handleStudentPdf = useCallback(async () => {
     if (!studentId || !periodId) {
@@ -247,6 +267,36 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
               onChange={setPeriodId}
               periods={periods}
             />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="mult-2-all" className="text-[13px]">
+                  Multiplicador (2 alumnos)
+                </Label>
+                <Input
+                  id="mult-2-all"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={group2Multiplier}
+                  onChange={(e) => setGroup2Multiplier(Number(e.target.value || 0))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mult-3-all" className="text-[13px]">
+                  Multiplicador (3+ alumnos)
+                </Label>
+                <Input
+                  id="mult-3-all"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  value={group3Multiplier}
+                  onChange={(e) => setGroup3Multiplier(Number(e.target.value || 0))}
+                />
+              </div>
+            </div>
             <ReportPdfButton
               loading={loading}
               activeKey="all"

@@ -54,6 +54,11 @@ export function TeachersRankingTable({
     }
   };
 
+  const sortAriaLabel = (column: SortKey, label: string) => {
+    if (sortKey !== column) return `Ordenar por ${label}`;
+    return sortAsc ? `Ordenar ${label} descendente` : `Ordenar ${label} ascendente`;
+  };
+
   const SortIcon = ({ column }: { column: SortKey }) =>
     sortKey === column ? (
       sortAsc ? (
@@ -84,6 +89,7 @@ export function TeachersRankingTable({
               size="sm"
               className="-ml-2 h-8 font-medium"
               onClick={() => toggleSort("teacher_name")}
+              aria-label={sortAriaLabel("teacher_name", "profesor")}
             >
               Profesor
               <SortIcon column="teacher_name" />
@@ -99,6 +105,7 @@ export function TeachersRankingTable({
               size="sm"
               className="-mr-2 h-8 font-medium"
               onClick={() => toggleSort("classes_count")}
+              aria-label={sortAriaLabel("classes_count", "clases")}
             >
               Clases
               <SortIcon column="classes_count" />
@@ -111,6 +118,7 @@ export function TeachersRankingTable({
               size="sm"
               className="-mr-2 h-8 font-medium"
               onClick={() => toggleSort("unique_students")}
+              aria-label={sortAriaLabel("unique_students", "alumnos únicos")}
             >
               Alumnos únicos
               <SortIcon column="unique_students" />
@@ -123,6 +131,7 @@ export function TeachersRankingTable({
               size="sm"
               className="-mr-2 h-8 font-medium"
               onClick={() => toggleSort("total_attendances")}
+              aria-label={sortAriaLabel("total_attendances", "asistencias")}
             >
               Asistencias
               <SortIcon column="total_attendances" />
@@ -135,6 +144,7 @@ export function TeachersRankingTable({
               size="sm"
               className="-mr-2 h-8 font-medium"
               onClick={() => toggleSort("avg_per_class")}
+              aria-label={sortAriaLabel("avg_per_class", "promedio por clase")}
             >
               Prom. por clase
               <SortIcon column="avg_per_class" />
@@ -147,6 +157,7 @@ export function TeachersRankingTable({
               size="sm"
               className="-mr-2 h-8 font-medium"
               onClick={() => toggleSort("last_class_date")}
+              aria-label={sortAriaLabel("last_class_date", "última clase")}
             >
               Última clase
               <SortIcon column="last_class_date" />

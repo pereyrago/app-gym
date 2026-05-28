@@ -20,6 +20,7 @@ import {
 import { EditClassDialog } from "./edit-class-dialog";
 import { deleteClassAction } from "@/app/teacher/classes/[classId]/actions";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface TeacherClassDetailCardProps {
   classId: string;
@@ -64,19 +65,17 @@ export function TeacherClassDetailCard({
 }: TeacherClassDetailCardProps) {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
   async function handleDelete() {
-    if (!window.confirm("¿Estás seguro de que quieres eliminar esta clase por completo? Esta acción no se puede deshacer.")) {
-      return;
-    }
-
     setIsDeleting(true);
     try {
       await deleteClassAction(classId);
       toast({ title: "Clase eliminada correctamente" });
+      setDeleteDialogOpen(false);
       router.push("/teacher/classes");
     } catch (e) {
       toast({
@@ -134,9 +133,9 @@ export function TeacherClassDetailCard({
                   <Pencil className="mr-2 h-4 w-4" />
                   Editar datos
                 </DropdownMenuItem>
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onClick={handleDelete}
+                  onSelect={() => setDeleteDialogOpen(true)}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Eliminar clase
@@ -167,6 +166,17 @@ export function TeacherClassDetailCard({
         classTypes={classTypes}
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
+      />
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Eliminar clase"
+        description="¿Estás seguro? Se eliminará la clase por completo. Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+        loading={isDeleting}
+        onConfirm={handleDelete}
       />
     </Card>
   );

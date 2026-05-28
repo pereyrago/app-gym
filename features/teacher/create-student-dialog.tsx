@@ -121,7 +121,12 @@ export function CreateStudentDialog() {
                 <FormItem>
                   <FormLabel>Email (opcional)</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="maria@ejemplo.com" {...field} />
+                    <Input
+                      type="email"
+                      placeholder="maria@ejemplo.com"
+                      spellCheck={false}
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
