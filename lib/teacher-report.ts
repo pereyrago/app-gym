@@ -25,7 +25,6 @@ export function pickStudentDisplayName(student: StudentEmbed | null): string | n
   return null;
 }
 
-/** Incluye asistencias registradas; excluye alumnos borrados o rechazados. */
 export function isIncludedInReport(student: StudentEmbed | null): boolean {
   if (!student) return false;
   if (student.deleted_at != null) return false;
@@ -90,7 +89,97 @@ export type TeacherReportClassInput = {
   duration_minutes?: number;
   attendancesCount: number;
   studentNames: string[];
+  status?: "success" | "cancel_by_student" | "cancel_by_teacher";
+  cancellation_reason?: string | null;
 };
+
+export interface CancellationSummary {
+  reason: string;
+  count: number;
+  by: "Profesor" | "Alumno";
+}
+
+export interface StudentActivitySummary {
+  studentName: string;
+  classesCount: number;
+}
+
+export function calculateCancellationSummary(classes: TeacherReportClassInput[]): CancellationSummary[] {
+  const cancelled = classes.filter((c) => c.status && c.status !== "success");
+  const summaryMap = new Map<string, { count: number; by: "Profesor" | "Alumno" }>();
+
+  for (const c of cancelled) {
+    const by = c.status === "cancel_by_teacher" ? "Profesor" : "Alumno";
+    const reason = c.cancellation_reason?.trim() || "Sin motivo especificado";
+    const key = `${by}-${reason}`;
+    const existing = summaryMap.get(key) || { count: 0, by };
+    summaryMap.set(key, { count: existing.count + 1, by: existing.by });
+  }
+
+  return Array.from(summaryMap.entries()).map(([key, value]) => ({
+    reason: key.split("-").slice(1).join("-"),
+    count: value.count,
+    by: value.by,
+  }));
+}
+
+export function calculateStudentActivity(classes: TeacherReportClassInput[]): StudentActivitySummary[] {
+  const activityMap = new Map<string, number>();
+
+  const successfulClasses = classes.filter((c) => !c.status || c.status === "success");
+
+  for (const c of successfulClasses) {
+    for (const name of c.studentNames) {
+      activityMap.set(name, (activityMap.get(name) || 0) + 1);
+    }
+  }
+
+  return Array.from(activityMap.entries())
+    .map(([studentName, classesCount]) => ({ studentName, classesCount }))
+    .sort((a, b) => b.classesCount - a.classesCount || a.studentName.localeCompare(b.studentName));
+}
+
+export interface ReportMetrics {
+  workedHours: number;
+  classesTaught: number;
+  uniqueStudents: number;
+  totalAttendances: number;
+  cancelledClasses: number;
+  avgStudentsPerClass: number;
+}
+
+export function calculateReportMetrics(classes: TeacherReportClassInput[]): ReportMetrics {
+  const successfulClasses = classes.filter((c) => !c.status || c.status === "success");
+  const cancelledClasses = classes.filter(
+    (c) => c.status === "cancel_by_student" || c.status === "cancel_by_teacher"
+  );
+
+  const totalMinutes = successfulClasses.reduce((sum, c) => sum + (c.duration_minutes ?? 60), 0);
+  const workedHours = totalMinutes / 60;
+  const classesTaught = successfulClasses.length;
+
+  const uniqueStudentsSet = new Set<string>();
+  let totalAttendances = 0;
+
+  for (const c of successfulClasses) {
+    totalAttendances += c.attendancesCount;
+    for (const name of c.studentNames) {
+      uniqueStudentsSet.add(name);
+    }
+  }
+
+  const uniqueStudents = uniqueStudentsSet.size;
+  const avgStudentsPerClass = classesTaught > 0 ? totalAttendances / classesTaught : 0;
+
+  return {
+    workedHours,
+    classesTaught,
+    uniqueStudents,
+    totalAttendances,
+    cancelledClasses: cancelledClasses.length,
+    avgStudentsPerClass,
+  };
+}
 
 export type TeacherLiquidationRow = {
   label: string;

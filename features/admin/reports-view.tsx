@@ -267,7 +267,7 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
               onChange={setPeriodId}
               periods={periods}
             />
-            <div className="grid grid-cols-2 gap-3">
+            {/* <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="mult-2-all" className="text-[13px]">
                   Multiplicador (2 alumnos)
@@ -296,7 +296,7 @@ export function ReportsView({ teachers, periods, students }: ReportsViewProps) {
                   onChange={(e) => setGroup3Multiplier(Number(e.target.value || 0))}
                 />
               </div>
-            </div>
+            </div> */}
             <ReportPdfButton
               loading={loading}
               activeKey="all"

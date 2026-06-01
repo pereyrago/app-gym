@@ -67,7 +67,7 @@ export function ReportPdfButton({
     <Button
       type="button"
       size="sm"
-      className="h-8 rounded px-3 text-[13px] font-medium"
+      className="h-8 rounded px-3 text-[13px] font-medium text-black"
       onClick={onClick}
       disabled={disabled || loading !== null}
     >
