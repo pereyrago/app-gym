@@ -90,7 +90,54 @@ export type TeacherReportClassInput = {
   attendancesCount: number;
   studentNames: string[];
   status?: "success" | "cancel_by_student" | "cancel_by_teacher";
+  cancellation_reason?: string | null;
 };
+
+export interface CancellationSummary {
+  reason: string;
+  count: number;
+  by: "Profesor" | "Alumno";
+}
+
+export interface StudentActivitySummary {
+  studentName: string;
+  classesCount: number;
+}
+
+export function calculateCancellationSummary(classes: TeacherReportClassInput[]): CancellationSummary[] {
+  const cancelled = classes.filter((c) => c.status && c.status !== "success");
+  const summaryMap = new Map<string, { count: number; by: "Profesor" | "Alumno" }>();
+
+  for (const c of cancelled) {
+    const by = c.status === "cancel_by_teacher" ? "Profesor" : "Alumno";
+    const reason = c.cancellation_reason?.trim() || "Sin motivo especificado";
+    const key = `${by}-${reason}`;
+    const existing = summaryMap.get(key) || { count: 0, by };
+    summaryMap.set(key, { count: existing.count + 1, by: existing.by });
+  }
+
+  return Array.from(summaryMap.entries()).map(([key, value]) => ({
+    reason: key.split("-").slice(1).join("-"),
+    count: value.count,
+    by: value.by,
+  }));
+}
+
+export function calculateStudentActivity(classes: TeacherReportClassInput[]): StudentActivitySummary[] {
+  const activityMap = new Map<string, number>();
+
+  const successfulClasses = classes.filter((c) => !c.status || c.status === "success");
+
+  for (const c of successfulClasses) {
+    for (const name of c.studentNames) {
+      activityMap.set(name, (activityMap.get(name) || 0) + 1);
+    }
+  }
+
+  return Array.from(activityMap.entries())
+    .map(([studentName, classesCount]) => ({ studentName, classesCount }))
+    .sort((a, b) => b.classesCount - a.classesCount || a.studentName.localeCompare(b.studentName));
+}
 
 export interface ReportMetrics {
   workedHours: number;

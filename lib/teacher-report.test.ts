@@ -5,8 +5,80 @@ import {
   pickStudentDisplayName,
   normalizeStudentEmbed,
   calculateReportMetrics,
+  calculateCancellationSummary,
+  calculateStudentActivity,
   type TeacherReportClassInput,
 } from "./teacher-report";
+
+describe("calculateCancellationSummary", () => {
+  it("agrupa cancelaciones por origen y motivo", () => {
+    const classes: TeacherReportClassInput[] = [
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-01",
+        attendancesCount: 0,
+        studentNames: [],
+        status: "cancel_by_student",
+        cancellation_reason: "Viaje",
+      },
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-02",
+        attendancesCount: 0,
+        studentNames: [],
+        status: "cancel_by_student",
+        cancellation_reason: "Viaje",
+      },
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-03",
+        attendancesCount: 0,
+        studentNames: [],
+        status: "cancel_by_teacher",
+        cancellation_reason: "Enfermedad",
+      },
+    ];
+
+    const summary = calculateCancellationSummary(classes);
+    expect(summary).toHaveLength(2);
+    expect(summary).toContainEqual({ by: "Alumno", reason: "Viaje", count: 2 });
+    expect(summary).toContainEqual({ by: "Profesor", reason: "Enfermedad", count: 1 });
+  });
+});
+
+describe("calculateStudentActivity", () => {
+  it("cuenta clases por alumno correctamente", () => {
+    const classes: TeacherReportClassInput[] = [
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-01",
+        attendancesCount: 2,
+        studentNames: ["Ana", "Beto"],
+        status: "success",
+      },
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-02",
+        attendancesCount: 1,
+        studentNames: ["Ana"],
+        status: "success",
+      },
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-03",
+        attendancesCount: 1,
+        studentNames: ["Carlos"],
+        status: "cancel_by_student",
+        cancellation_reason: "Falta",
+      },
+    ];
+
+    const activity = calculateStudentActivity(classes);
+    expect(activity).toHaveLength(2);
+    expect(activity[0]).toEqual({ studentName: "Ana", classesCount: 2 });
+    expect(activity[1]).toEqual({ studentName: "Beto", classesCount: 1 });
+  });
+});
 
 describe("calculateReportMetrics", () => {
   it("calcula métricas correctamente para un conjunto mixto de clases", () => {

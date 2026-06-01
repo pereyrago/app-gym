@@ -2,7 +2,9 @@ import type { jsPDF } from "jspdf";
 import { formatClassDate } from "@/lib/app-timezone";
 import {
   buildTeacherLiquidationRows,
+  calculateCancellationSummary,
   calculateReportMetrics,
+  calculateStudentActivity,
   type TeacherReportClassInput,
 } from "@/lib/teacher-report";
 
@@ -222,6 +224,64 @@ export function drawLiquidationTable(
   return y + rowH + 10;
 }
 
+export function drawCancellationSection(
+  ctx: PdfLayoutContext,
+  y: number,
+  classes: ReportClassRow[]
+): number {
+  const { doc, tableX } = ctx;
+  const cancellations = calculateCancellationSummary(classes as TeacherReportClassInput[]);
+
+  if (cancellations.length === 0) return y;
+
+  y = paginateIfNeeded(ctx, y, 250);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Motivos de Cancelación de Clases", tableX, y);
+  y += 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  for (const c of cancellations) {
+    y = paginateIfNeeded(ctx, y);
+    doc.text(`• ${c.by}: ${c.reason} (${c.count} ${c.count === 1 ? "vez" : "veces"})`, tableX + 2, y);
+    y += 5;
+  }
+
+  return y + 5;
+}
+
+export function drawStudentActivityTable(
+  ctx: PdfLayoutContext,
+  y: number,
+  classes: ReportClassRow[]
+): number {
+  const { doc, tableX, tableW } = ctx;
+  const activity = calculateStudentActivity(classes as TeacherReportClassInput[]);
+
+  if (activity.length === 0) return y;
+
+  y = paginateIfNeeded(ctx, y, 250);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Cantidad de Clases dadas por Alumno", tableX, y);
+  y += 6;
+
+  const colName = tableX;
+  const colCount = tableX + tableW * 0.95;
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  for (const a of activity) {
+    y = paginateIfNeeded(ctx, y);
+    doc.text(a.studentName, colName + 2, y);
+    doc.text(String(a.classesCount), colCount, y, { align: "right" });
+    y += 5;
+  }
+
+  return y + 5;
+}
+
 export function drawChronologicalTable(
   ctx: PdfLayoutContext,
   y: number,
@@ -302,6 +362,8 @@ export function drawTeacherReportSection(
     group2StudentMultiplier: options.group2StudentMultiplier,
     group3StudentMultiplier: options.group3StudentMultiplier,
   });
+  y = drawCancellationSection(ctx, y, classes);
+  y = drawStudentActivityTable(ctx, y, classes);
   y = drawChronologicalTable(ctx, y, classes);
   return y;
 }

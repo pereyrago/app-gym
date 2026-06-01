@@ -36,7 +36,7 @@ export async function getReportDataForTeacher(
 
   const { data: classesData } = await supabase
     .from("classes")
-    .select("id, class_date, start_time, duration_minutes, status, class_types(name)")
+    .select("id, class_date, start_time, duration_minutes, status, cancellation_reason, class_types(name)")
     .eq("teacher_id", teacherId)
     .eq("period_id", periodId)
     .order("class_date", { ascending: true })
@@ -48,6 +48,7 @@ export async function getReportDataForTeacher(
     start_time: string;
     duration_minutes: number;
     status: "success" | "cancel_by_student" | "cancel_by_teacher";
+    cancellation_reason: string | null;
     class_types: { name: string } | null;
   }>;
   if (!classes.length) {
@@ -89,6 +90,7 @@ export async function getReportDataForTeacher(
       attendancesCount: studentNames.length,
       studentNames,
       status: c.status,
+      cancellation_reason: c.cancellation_reason,
     };
   });
 
@@ -117,7 +119,7 @@ export async function getReportDataForAllTeachers(
 
   const { data: classesData, error: classesError } = await supabase
     .from("classes")
-    .select("id, teacher_id, class_date, start_time, duration_minutes, status, class_types(name)")
+    .select("id, teacher_id, class_date, start_time, duration_minutes, status, cancellation_reason, class_types(name)")
     .eq("period_id", periodId)
     .order("class_date", { ascending: true })
     .order("start_time", { ascending: true });
@@ -131,6 +133,7 @@ export async function getReportDataForAllTeachers(
     start_time: string;
     duration_minutes: number;
     status: "success" | "cancel_by_student" | "cancel_by_teacher";
+    cancellation_reason: string | null;
     class_types: { name: string } | null;
   }>;
 
@@ -186,6 +189,7 @@ export async function getReportDataForAllTeachers(
         attendancesCount: studentNames.length,
         studentNames,
         status: c.status,
+        cancellation_reason: c.cancellation_reason,
       };
     });
 
