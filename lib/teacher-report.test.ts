@@ -4,7 +4,67 @@ import {
   groupAttendancesByClassId,
   pickStudentDisplayName,
   normalizeStudentEmbed,
+  calculateReportMetrics,
+  type TeacherReportClassInput,
 } from "./teacher-report";
+
+describe("calculateReportMetrics", () => {
+  it("calcula métricas correctamente para un conjunto mixto de clases", () => {
+    const classes: TeacherReportClassInput[] = [
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-01",
+        duration_minutes: 60,
+        attendancesCount: 2,
+        studentNames: ["Ana", "Beto"],
+        status: "success",
+      },
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-02",
+        duration_minutes: 90,
+        attendancesCount: 3,
+        studentNames: ["Ana", "Carlos", "Dora"],
+        status: "success",
+      },
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-03",
+        duration_minutes: 60,
+        attendancesCount: 1,
+        studentNames: ["Beto"],
+        status: "cancel_by_student",
+      },
+      {
+        classTypeName: "Yoga",
+        class_date: "2025-05-04",
+        duration_minutes: 60,
+        attendancesCount: 0,
+        studentNames: [],
+        status: "cancel_by_teacher",
+      },
+    ];
+
+    const metrics = calculateReportMetrics(classes);
+
+    expect(metrics.workedHours).toBe(2.5); // (60 + 90) / 60
+    expect(metrics.classesTaught).toBe(2);
+    expect(metrics.uniqueStudents).toBe(4); // Ana, Beto, Carlos, Dora
+    expect(metrics.totalAttendances).toBe(5); // 2 + 3
+    expect(metrics.cancelledClasses).toBe(2);
+    expect(metrics.avgStudentsPerClass).toBe(2.5); // 5 / 2
+  });
+
+  it("devuelve ceros si no hay clases", () => {
+    const metrics = calculateReportMetrics([]);
+    expect(metrics.workedHours).toBe(0);
+    expect(metrics.classesTaught).toBe(0);
+    expect(metrics.uniqueStudents).toBe(0);
+    expect(metrics.totalAttendances).toBe(0);
+    expect(metrics.cancelledClasses).toBe(0);
+    expect(metrics.avgStudentsPerClass).toBe(0);
+  });
+});
 
 describe("pickStudentDisplayName", () => {
   it("prefiere full_name sobre email", () => {

@@ -1,6 +1,10 @@
 import type { jsPDF } from "jspdf";
 import { formatClassDate } from "@/lib/app-timezone";
-import { buildTeacherLiquidationRows, type TeacherReportClassInput } from "@/lib/teacher-report";
+import {
+  buildTeacherLiquidationRows,
+  calculateReportMetrics,
+  type TeacherReportClassInput,
+} from "@/lib/teacher-report";
 
 export const PDF_LOGO_RATIO_W = 404;
 export const PDF_LOGO_RATIO_H = 380;
@@ -21,6 +25,7 @@ export type ReportClassRow = {
   duration_minutes?: number;
   attendancesCount: number;
   studentNames: string[];
+  status?: "success" | "cancel_by_student" | "cancel_by_teacher";
 };
 
 export type PdfLayoutContext = {
@@ -100,22 +105,63 @@ export function drawBrandedHeader(
   return nextY;
 }
 
+export function drawKeyIndicators(
+  ctx: PdfLayoutContext,
+  y: number,
+  classes: ReportClassRow[]
+): number {
+  const { doc, tableX, tableW } = ctx;
+  const metrics = calculateReportMetrics(classes as TeacherReportClassInput[]);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Indicadores Clave del Período", tableX, y);
+  y += 6;
+
+  const cardW = tableW / 3 - 2;
+  const cardH = 15;
+  const row1Y = y;
+  const row2Y = y + cardH + 2;
+
+  const drawCard = (label: string, value: string, x: number, cardY: number) => {
+    doc.setDrawColor(220);
+    doc.setFillColor(252, 252, 252);
+    doc.roundedRect(x, cardY, cardW, cardH, 1, 1, "FD");
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(100);
+    doc.text(label, x + 2, cardY + 5);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+    doc.text(value, x + 2, cardY + 11);
+  };
+
+  drawCard("Horas trabajadas", `${formatPdfNumber(metrics.workedHours)} hs`, tableX, row1Y);
+  drawCard("Clases dictadas", String(metrics.classesTaught), tableX + cardW + 3, row1Y);
+  drawCard("Alumnos asistentes", String(metrics.uniqueStudents), tableX + (cardW + 3) * 2, row1Y);
+
+  drawCard("Asistencias totales", String(metrics.totalAttendances), tableX, row2Y);
+  drawCard("Clases canceladas", String(metrics.cancelledClasses), tableX + cardW + 3, row2Y);
+  drawCard(
+    "Promedio alumnos/clase",
+    formatPdfNumber(metrics.avgStudentsPerClass),
+    tableX + (cardW + 3) * 2,
+    row2Y
+  );
+
+  return row2Y + cardH + 10;
+}
+
 export function drawTeacherSummaryLine(
   ctx: PdfLayoutContext,
   y: number,
   classes: ReportClassRow[]
 ): number {
-  const { doc, marginLeft } = ctx;
-  const totalMinutes = classes.reduce((sum, c) => sum + (c.duration_minutes ?? 60), 0);
-  const totalHours = totalMinutes / 60;
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text(
-    `Total de horas trabajadas en el periodo: ${formatPdfNumber(totalHours)} hs`,
-    marginLeft,
-    y
-  );
-  return y + 10;
+  // This function is being replaced by drawKeyIndicators, but we'll keep it for now if needed.
+  return y;
 }
 
 export function drawLiquidationTable(
@@ -238,7 +284,6 @@ export function drawTeacherReportSection(
   options: {
     group2StudentMultiplier?: number;
     group3StudentMultiplier?: number;
-    /** Si el nombre ya figura en el encabezado de página, omitir repetirlo. */
     skipTeacherTitle?: boolean;
     teacherName?: string;
   } = {}
@@ -252,7 +297,7 @@ export function drawTeacherReportSection(
     y += 7;
   }
 
-  y = drawTeacherSummaryLine(ctx, y, classes);
+  y = drawKeyIndicators(ctx, y, classes);
   y = drawLiquidationTable(ctx, y, classes, {
     group2StudentMultiplier: options.group2StudentMultiplier,
     group3StudentMultiplier: options.group3StudentMultiplier,

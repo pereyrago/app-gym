@@ -25,7 +25,6 @@ export function pickStudentDisplayName(student: StudentEmbed | null): string | n
   return null;
 }
 
-/** Incluye asistencias registradas; excluye alumnos borrados o rechazados. */
 export function isIncludedInReport(student: StudentEmbed | null): boolean {
   if (!student) return false;
   if (student.deleted_at != null) return false;
@@ -90,7 +89,50 @@ export type TeacherReportClassInput = {
   duration_minutes?: number;
   attendancesCount: number;
   studentNames: string[];
+  status?: "success" | "cancel_by_student" | "cancel_by_teacher";
 };
+
+export interface ReportMetrics {
+  workedHours: number;
+  classesTaught: number;
+  uniqueStudents: number;
+  totalAttendances: number;
+  cancelledClasses: number;
+  avgStudentsPerClass: number;
+}
+
+export function calculateReportMetrics(classes: TeacherReportClassInput[]): ReportMetrics {
+  const successfulClasses = classes.filter((c) => !c.status || c.status === "success");
+  const cancelledClasses = classes.filter(
+    (c) => c.status === "cancel_by_student" || c.status === "cancel_by_teacher"
+  );
+
+  const totalMinutes = successfulClasses.reduce((sum, c) => sum + (c.duration_minutes ?? 60), 0);
+  const workedHours = totalMinutes / 60;
+  const classesTaught = successfulClasses.length;
+
+  const uniqueStudentsSet = new Set<string>();
+  let totalAttendances = 0;
+
+  for (const c of successfulClasses) {
+    totalAttendances += c.attendancesCount;
+    for (const name of c.studentNames) {
+      uniqueStudentsSet.add(name);
+    }
+  }
+
+  const uniqueStudents = uniqueStudentsSet.size;
+  const avgStudentsPerClass = classesTaught > 0 ? totalAttendances / classesTaught : 0;
+
+  return {
+    workedHours,
+    classesTaught,
+    uniqueStudents,
+    totalAttendances,
+    cancelledClasses: cancelledClasses.length,
+    avgStudentsPerClass,
+  };
+}
 
 export type TeacherLiquidationRow = {
   label: string;
