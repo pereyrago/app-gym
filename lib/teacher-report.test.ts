@@ -41,8 +41,25 @@ describe("calculateCancellationSummary", () => {
 
     const summary = calculateCancellationSummary(classes);
     expect(summary).toHaveLength(2);
-    expect(summary).toContainEqual({ by: "Alumno", reason: "Viaje", count: 2 });
-    expect(summary).toContainEqual({ by: "Profesor", reason: "Enfermedad", count: 1 });
+    expect(summary).toContainEqual(
+      expect.objectContaining({
+        by: "Alumno",
+        reason: "Viaje",
+        count: 2,
+        details: [
+          { date: "2025-05-01", studentNames: [] },
+          { date: "2025-05-02", studentNames: [] },
+        ],
+      })
+    );
+    expect(summary).toContainEqual(
+      expect.objectContaining({
+        by: "Profesor",
+        reason: "Enfermedad",
+        count: 1,
+        details: [{ date: "2025-05-03", studentNames: [] }],
+      })
+    );
   });
 });
 

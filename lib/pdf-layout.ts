@@ -244,8 +244,21 @@ export function drawCancellationSection(
   doc.setFontSize(9);
   for (const c of cancellations) {
     y = paginateIfNeeded(ctx, y);
+    doc.setFont("helvetica", "bold");
     doc.text(`• ${c.by}: ${c.reason} (${c.count} ${c.count === 1 ? "vez" : "veces"})`, tableX + 2, y);
     y += 5;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    for (const detail of c.details) {
+      y = paginateIfNeeded(ctx, y);
+      const formattedDate = formatClassDate(detail.date);
+      const students = detail.studentNames.join(", ") || "Sin alumnos";
+      doc.text(`  - ${formattedDate}: ${students}`, tableX + 6, y);
+      y += 4;
+    }
+    y += 2;
+    doc.setFontSize(9);
   }
 
   return y + 5;

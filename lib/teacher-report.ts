@@ -93,10 +93,16 @@ export type TeacherReportClassInput = {
   cancellation_reason?: string | null;
 };
 
+export interface CancellationDetail {
+  date: string;
+  studentNames: string[];
+}
+
 export interface CancellationSummary {
   reason: string;
   count: number;
   by: "Profesor" | "Alumno";
+  details: CancellationDetail[];
 }
 
 export interface StudentActivitySummary {
@@ -106,20 +112,34 @@ export interface StudentActivitySummary {
 
 export function calculateCancellationSummary(classes: TeacherReportClassInput[]): CancellationSummary[] {
   const cancelled = classes.filter((c) => c.status && c.status !== "success");
-  const summaryMap = new Map<string, { count: number; by: "Profesor" | "Alumno" }>();
+  const summaryMap = new Map<
+    string,
+    { count: number; by: "Profesor" | "Alumno"; details: CancellationDetail[] }
+  >();
 
   for (const c of cancelled) {
     const by = c.status === "cancel_by_teacher" ? "Profesor" : "Alumno";
     const reason = c.cancellation_reason?.trim() || "Sin motivo especificado";
     const key = `${by}-${reason}`;
-    const existing = summaryMap.get(key) || { count: 0, by };
-    summaryMap.set(key, { count: existing.count + 1, by: existing.by });
+    const existing = summaryMap.get(key) || { count: 0, by, details: [] };
+
+    existing.details.push({
+      date: c.class_date,
+      studentNames: c.studentNames,
+    });
+
+    summaryMap.set(key, {
+      count: existing.count + 1,
+      by: existing.by,
+      details: existing.details,
+    });
   }
 
   return Array.from(summaryMap.entries()).map(([key, value]) => ({
     reason: key.split("-").slice(1).join("-"),
     count: value.count,
     by: value.by,
+    details: value.details,
   }));
 }
 
