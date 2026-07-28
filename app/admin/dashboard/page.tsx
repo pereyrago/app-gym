@@ -3,9 +3,9 @@ import Link from "next/link";
 import { subDays } from "date-fns";
 import { createClient } from "@/lib/supabase/server";
 import { toAppTzDateString } from "@/lib/app-timezone";
-import { getPeriods, getCurrentPeriod } from "@/repositories/periods";
+import { getCurrentPeriod } from "@/repositories/periods";
 import { getTeachersWithProfiles } from "@/repositories/teachers";
-import { getClassTypes } from "@/repositories/class-types";
+import { getStudents } from "@/repositories/students";
 import {
   getDashboardKpis,
   getClassesByDay,
@@ -31,9 +31,16 @@ import {
   getIndividualVsSharedByTeacher,
   getIndividualVsSharedTotals,
 } from "@/repositories/dashboard-queries";
+import {
+  getExecutiveSummaryKpis,
+  getBusinessEvolutionByDay,
+  getTeacherRankingMetrics,
+} from "@/repositories/dashboard-executive-queries";
 import type { DashboardFilters } from "@/features/dashboard/types";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardFiltersClient } from "@/components/dashboard/dashboard-filters";
+import { ExecutiveSummaryKpisSection } from "@/components/dashboard/executive-summary-kpis";
+import { BusinessPerformanceSection } from "@/components/dashboard/business-performance-section";
 import { DashboardTabsContent } from "@/components/dashboard/dashboard-tabs-content";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -59,19 +66,24 @@ export default async function AdminDashboardPage({
   const params = await searchParams;
   const defaultRange = await getDefaultDateRange();
   const filters: DashboardFilters = {
-    periodId: typeof params.period_id === "string" ? params.period_id : null,
     dateFrom: typeof params.date_from === "string" ? params.date_from : defaultRange.dateFrom,
     dateTo: typeof params.date_to === "string" ? params.date_to : defaultRange.dateTo,
     teacherId: typeof params.teacher_id === "string" ? params.teacher_id : null,
-    classTypeId: typeof params.class_type_id === "string" ? params.class_type_id : null,
+    studentId: typeof params.student_id === "string" ? params.student_id : null,
+    classMode:
+      params.class_mode === "individual" || params.class_mode === "shared"
+        ? params.class_mode
+        : null,
   };
 
   const supabase = await createClient();
 
   const [
-    periods,
     teachers,
-    classTypes,
+    students,
+    executiveSummaryKpis,
+    businessEvolution,
+    teacherRanking,
     kpis,
     classesByDay,
     attendanceByDay,
@@ -96,9 +108,11 @@ export default async function AdminDashboardPage({
     individualVsSharedByTeacher,
     individualVsSharedTotals,
   ] = await Promise.all([
-    getPeriods(),
     getTeachersWithProfiles(),
-    getClassTypes(),
+    getStudents(),
+    getExecutiveSummaryKpis(supabase, filters),
+    getBusinessEvolutionByDay(supabase, filters),
+    getTeacherRankingMetrics(supabase, filters),
     getDashboardKpis(supabase, filters),
     getClassesByDay(supabase, filters),
     getAttendanceByDay(supabase, filters),
@@ -129,12 +143,14 @@ export default async function AdminDashboardPage({
   const topClassType = classTypePerformance[0]?.class_type_name ?? null;
   const topTeacherByAvg = teachersPerformance[0]?.teacher_name ?? null;
 
-  const periodOptions = periods.map((p) => ({ id: p.id, name: p.name }));
   const teacherOptions = teachers.map((t) => ({
     id: t.id,
     full_name: t.profiles?.full_name ?? null,
   }));
-  const classTypeOptions = classTypes.map((ct) => ({ id: ct.id, name: ct.name }));
+  const studentOptions = students.map((s) => ({
+    id: s.id,
+    full_name: s.full_name ?? null,
+  }));
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -150,9 +166,20 @@ export default async function AdminDashboardPage({
       <Suspense fallback={<Skeleton className="h-32 w-full rounded-lg" />}>
         <DashboardFiltersClient
           filters={filters}
-          periods={periodOptions}
           teachers={teacherOptions}
-          classTypes={classTypeOptions}
+          students={studentOptions}
+        />
+      </Suspense>
+
+      <Suspense fallback={<Skeleton className="h-32 w-full rounded-lg" />}>
+        <ExecutiveSummaryKpisSection data={executiveSummaryKpis} />
+      </Suspense>
+
+      <Suspense fallback={<Skeleton className="h-96 w-full rounded-lg" />}>
+        <BusinessPerformanceSection
+          businessEvolution={businessEvolution}
+          teacherRanking={teacherRanking}
+          studentsByTeacher={studentsByTeacher}
         />
       </Suspense>
 
@@ -167,7 +194,6 @@ export default async function AdminDashboardPage({
         newStudentsByMonth={newStudentsByMonth}
         activeStudentsEvolution={activeStudentsEvolution}
         teachersPerformance={teachersPerformance}
-        studentsByTeacher={studentsByTeacher}
         classTypePerformance={classTypePerformance}
         attendanceByClassTypeOverTime={attendanceByClassTypeOverTime}
         topStudentsCancellations={topStudentsCancellations}

@@ -144,6 +144,45 @@ export type IndividualVsSharedTotalsRow = {
   shared_total: number;
 };
 
+/** Un trío actual/anterior/variación % para una métrica del Resumen Ejecutivo. */
+export type ExecutiveKpiMetric = {
+  current: number;
+  previous: number;
+  variationPct: number;
+};
+
+/** Resumen Ejecutivo (Bloque 1), devuelto por get_executive_summary_kpis. Satisfacción diferida. */
+export type ExecutiveSummaryKpis = {
+  activeStudents: ExecutiveKpiMetric;
+  classes: ExecutiveKpiMetric;
+  teachers: ExecutiveKpiMetric;
+  cancellations: ExecutiveKpiMetric;
+  hours: ExecutiveKpiMetric;
+  attendanceRatePct: ExecutiveKpiMetric;
+  newStudents: ExecutiveKpiMetric;
+};
+
+/** Una fila diaria del gráfico unificado de evolución (Bloque 2), get_business_evolution_by_day. */
+export type BusinessEvolutionRow = {
+  day: string;
+  classes_count: number;
+  hours: number;
+  active_students_count: number;
+  new_students_count: number;
+  cancellations_count: number;
+};
+
+/** Ranking de profesores unificado (Bloque 3), get_teacher_ranking_metrics. */
+export type TeacherRankingRow = {
+  teacher_id: string;
+  teacher_name: string;
+  classes_count: number;
+  unique_students: number;
+  hours: number;
+  cancellations_count: number;
+  attendance_pct: number;
+};
+
 /** Opciones para llamar a las RPCs (filtros opcionales). */
 export type DashboardRpcParams = {
   p_period_id?: string | null;

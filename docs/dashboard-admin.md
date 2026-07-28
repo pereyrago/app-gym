@@ -77,9 +77,15 @@ Los filtros se pasan por **URL** (`period_id`, `date_from`, `date_to`, `teacher_
 
 ## Definiciones de negocio
 
-- **Alumno activo**: asistió al menos una vez en los últimos 15 días.
-- **Alumno inactivo**: no asistió en los últimos 15 días.
-- **Alumno en riesgo**: no asistió en los últimos 30 días.
+> **Changelog (migración 021)**: estas definiciones cambiaron para alinearse con el
+> spec del "Dashboard Ejecutivo". Antes: activo = asistió en los últimos 15 días
+> (ventana fija relativa al filtro), en riesgo = no asistió en 30+ días, sin nivel
+> "inactivo" separado. Los números de `Alumnos activos` / `En riesgo de abandono`
+> visibles en este dashboard cambian a partir de este deploy.
+
+- **Alumno activo**: entrenó durante el período seleccionado, o su última clase (sin restricción de fecha, respetando los demás filtros) fue hace 14 días o menos.
+- **Alumno en riesgo**: no entrena hace más de 14 días (y 30 o menos).
+- **Alumno inactivo**: no entrena hace más de 30 días, o nunca entrenó.
 - **Promedio de alumnos por clase**: total asistencias / total clases (en el período filtrado).
 
 ## UX

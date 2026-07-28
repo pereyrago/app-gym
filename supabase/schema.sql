@@ -367,7 +367,9 @@ CREATE OR REPLACE FUNCTION public.get_dashboard_kpis(
   p_date_from DATE DEFAULT NULL,
   p_date_to DATE DEFAULT NULL,
   p_teacher_id UUID DEFAULT NULL,
-  p_class_type_id UUID DEFAULT NULL
+  p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL,
+  p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (
   total_students BIGINT, active_students BIGINT, inactive_students BIGINT, at_risk_students BIGINT,
@@ -382,26 +384,50 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
       AND (p_date_to IS NULL OR c.class_date <= p_date_to)
       AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
       AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR EXISTS (
+        SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+        UNION ALL
+        SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+      ))
   ),
-  date_range AS (
-    SELECT COALESCE(p_date_from, (SELECT MIN(class_date) FROM classes)) AS d_from,
-           COALESCE(p_date_to, (SELECT MAX(class_date) FROM classes)) AS d_to
-  ),
-  last_15 AS (
+  period_attendees AS (
     SELECT DISTINCT ca.student_id FROM class_attendances ca
     JOIN filtered_classes fc ON fc.id = ca.class_id
-    JOIN date_range dr ON fc.class_date >= (dr.d_from - INTERVAL '15 days') AND fc.class_date <= dr.d_to
   ),
-  last_30 AS (
-    SELECT DISTINCT ca.student_id FROM class_attendances ca
-    JOIN filtered_classes fc ON fc.id = ca.class_id
-    JOIN date_range dr ON fc.class_date >= (dr.d_from - INTERVAL '30 days') AND fc.class_date <= dr.d_to
+  last_attendance AS (
+    SELECT ca.student_id, MAX(c.class_date) AS last_date
+    FROM class_attendances ca JOIN classes c ON c.id = ca.class_id
+    WHERE (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR ca.student_id = p_student_id)
+    GROUP BY ca.student_id
   ),
-  inactive_set AS (SELECT s.id FROM students s WHERE s.deleted_at IS NULL EXCEPT SELECT student_id FROM last_15),
-  at_risk_set AS (SELECT s.id FROM students s WHERE s.deleted_at IS NULL EXCEPT SELECT student_id FROM last_30),
+  recent_attendees AS (
+    SELECT student_id FROM last_attendance WHERE (CURRENT_DATE - last_date) <= 14
+  ),
+  active_set AS (
+    SELECT student_id FROM period_attendees
+    UNION
+    SELECT student_id FROM recent_attendees
+  ),
+  base_students AS (SELECT id FROM students WHERE deleted_at IS NULL),
+  at_risk_set AS (
+    SELECT bs.id FROM base_students bs
+    JOIN last_attendance la ON la.student_id = bs.id
+    WHERE bs.id NOT IN (SELECT student_id FROM active_set)
+      AND (CURRENT_DATE - la.last_date) > 14 AND (CURRENT_DATE - la.last_date) <= 30
+  ),
+  inactive_set AS (
+    SELECT bs.id FROM base_students bs
+    LEFT JOIN last_attendance la ON la.student_id = bs.id
+    WHERE bs.id NOT IN (SELECT student_id FROM active_set)
+      AND (la.last_date IS NULL OR (CURRENT_DATE - la.last_date) > 30)
+  ),
   kpi AS (
     SELECT (SELECT COUNT(*)::BIGINT FROM students WHERE deleted_at IS NULL) AS total_students,
-      (SELECT COUNT(*)::BIGINT FROM last_15) AS active_students,
+      (SELECT COUNT(*)::BIGINT FROM active_set) AS active_students,
       (SELECT COUNT(*)::BIGINT FROM inactive_set) AS inactive_students,
       (SELECT COUNT(*)::BIGINT FROM at_risk_set) AS at_risk_students,
       (SELECT COUNT(DISTINCT teacher_id)::BIGINT FROM filtered_classes) AS total_teachers,
@@ -419,7 +445,8 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.get_classes_by_day(
   p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL,
-  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (day DATE, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT c.class_date AS day, COUNT(*)::BIGINT FROM classes c
@@ -428,12 +455,19 @@ RETURNS TABLE (day DATE, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET 
     AND (p_date_to IS NULL OR c.class_date <= p_date_to)
     AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
     AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR EXISTS (
+      SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+      UNION ALL
+      SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+    ))
   GROUP BY c.class_date ORDER BY c.class_date;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_attendance_by_day(
   p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL,
-  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (day DATE, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT c.class_date AS day, COUNT(ca.id)::BIGINT FROM class_attendances ca
@@ -443,12 +477,15 @@ RETURNS TABLE (day DATE, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET 
     AND (p_date_to IS NULL OR c.class_date <= p_date_to)
     AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
     AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR ca.student_id = p_student_id)
   GROUP BY c.class_date ORDER BY c.class_date;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_attendance_by_weekday(
   p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL,
-  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (weekday INT, weekday_name TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH names AS (
@@ -460,12 +497,15 @@ RETURNS TABLE (weekday INT, weekday_name TEXT, count BIGINT) LANGUAGE sql STABLE
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
     AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR ca.student_id = p_student_id)
   GROUP BY EXTRACT(DOW FROM c.class_date::timestamp), n.n ORDER BY weekday;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_attendance_by_time_slot(
   p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL,
-  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (time_slot TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT (c.start_time::TEXT)::TEXT AS time_slot, COUNT(ca.id)::BIGINT
@@ -473,20 +513,46 @@ RETURNS TABLE (time_slot TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINE
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
     AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR ca.student_id = p_student_id)
   GROUP BY c.start_time ORDER BY count DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_students_activity_summary(p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL)
 RETURNS TABLE (status TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  WITH dr AS (SELECT COALESCE(p_date_from, (SELECT MIN(class_date) FROM classes)) AS d_from, COALESCE(p_date_to, (SELECT MAX(class_date) FROM classes)) AS d_to),
-  last_15 AS (SELECT DISTINCT ca.student_id FROM class_attendances ca JOIN classes c ON c.id = ca.class_id, dr WHERE c.class_date >= (dr.d_from - INTERVAL '15 days') AND c.class_date <= dr.d_to),
-  last_30 AS (SELECT DISTINCT ca.student_id FROM class_attendances ca JOIN classes c ON c.id = ca.class_id, dr WHERE c.class_date >= (dr.d_from - INTERVAL '30 days') AND c.class_date <= dr.d_to),
-  base AS (SELECT id FROM students WHERE deleted_at IS NULL),
-  inactive AS (SELECT id FROM base EXCEPT SELECT student_id FROM last_15),
-  at_risk AS (SELECT id FROM base EXCEPT SELECT student_id FROM last_30)
-  SELECT 'active' AS status, (SELECT COUNT(*)::BIGINT FROM last_15) AS count
-  UNION ALL SELECT 'inactive', (SELECT COUNT(*)::BIGINT FROM inactive)
-  UNION ALL SELECT 'at_risk', (SELECT COUNT(*)::BIGINT FROM at_risk);
+  WITH period_attendees AS (
+    SELECT DISTINCT ca.student_id FROM class_attendances ca JOIN classes c ON c.id = ca.class_id
+    WHERE (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to)
+  ),
+  last_attendance AS (
+    SELECT ca.student_id, MAX(c.class_date) AS last_date
+    FROM class_attendances ca JOIN classes c ON c.id = ca.class_id
+    GROUP BY ca.student_id
+  ),
+  recent_attendees AS (
+    SELECT student_id FROM last_attendance WHERE (CURRENT_DATE - last_date) <= 14
+  ),
+  active_set AS (
+    SELECT student_id FROM period_attendees
+    UNION
+    SELECT student_id FROM recent_attendees
+  ),
+  base_students AS (SELECT id FROM students WHERE deleted_at IS NULL),
+  at_risk_set AS (
+    SELECT bs.id FROM base_students bs
+    JOIN last_attendance la ON la.student_id = bs.id
+    WHERE bs.id NOT IN (SELECT student_id FROM active_set)
+      AND (CURRENT_DATE - la.last_date) > 14 AND (CURRENT_DATE - la.last_date) <= 30
+  ),
+  inactive_set AS (
+    SELECT bs.id FROM base_students bs
+    LEFT JOIN last_attendance la ON la.student_id = bs.id
+    WHERE bs.id NOT IN (SELECT student_id FROM active_set)
+      AND (la.last_date IS NULL OR (CURRENT_DATE - la.last_date) > 30)
+  )
+  SELECT 'active' AS status, (SELECT COUNT(*)::BIGINT FROM active_set) AS count
+  UNION ALL SELECT 'at_risk', (SELECT COUNT(*)::BIGINT FROM at_risk_set)
+  UNION ALL SELECT 'inactive', (SELECT COUNT(*)::BIGINT FROM inactive_set);
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_new_students_by_month(p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL)
@@ -498,7 +564,8 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.get_active_students_evolution(
   p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL,
-  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (day DATE, active_count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH filtered_classes AS (
@@ -506,14 +573,17 @@ RETURNS TABLE (day DATE, active_count BIGINT) LANGUAGE sql STABLE SECURITY DEFIN
     WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
       AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
       AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
   ),
   days AS (SELECT generate_series(COALESCE(p_date_from, (SELECT MIN(class_date) FROM classes)), COALESCE(p_date_to, (SELECT MAX(class_date) FROM classes)), '1 day'::interval)::date AS day)
   SELECT d.day, (SELECT COUNT(DISTINCT ca.student_id)::BIGINT FROM class_attendances ca JOIN filtered_classes fc ON fc.id = ca.class_id
-    WHERE fc.class_date >= (d.day - INTERVAL '15 days') AND fc.class_date <= d.day) FROM days d ORDER BY d.day;
+    WHERE fc.class_date >= (d.day - INTERVAL '15 days') AND fc.class_date <= d.day
+      AND (p_student_id IS NULL OR ca.student_id = p_student_id)) FROM days d ORDER BY d.day;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_teachers_performance_summary(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (
   teacher_id UUID, teacher_name TEXT, teacher_email TEXT, teacher_dni TEXT, teacher_phone TEXT,
@@ -524,6 +594,12 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     SELECT c.id, c.teacher_id, c.class_date FROM classes c
     WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
       AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR EXISTS (
+        SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+        UNION ALL
+        SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+      ))
   ),
   agg AS (
     SELECT fc.teacher_id, COUNT(DISTINCT fc.id)::BIGINT AS classes_count, COUNT(DISTINCT ca.student_id)::BIGINT AS unique_students,
@@ -544,7 +620,8 @@ RETURNS TABLE (teacher_id UUID, teacher_name TEXT, student_count BIGINT) LANGUAG
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_class_type_performance_summary(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (class_type_id UUID, class_type_name TEXT, classes_count BIGINT, total_attendances BIGINT)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -552,6 +629,12 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     SELECT c.id, c.class_type_id, c.class_date FROM classes c
     WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
       AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR EXISTS (
+        SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+        UNION ALL
+        SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+      ))
   ),
   agg AS (SELECT fc.class_type_id, COUNT(DISTINCT fc.id)::BIGINT AS classes_count, COUNT(ca.id)::BIGINT AS total_attendances
     FROM filtered_classes fc LEFT JOIN class_attendances ca ON ca.class_id = fc.id GROUP BY fc.class_type_id)
@@ -559,40 +642,50 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_attendance_by_class_type_over_time(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (day DATE, class_type_name TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT c.class_date AS day, ct.name::TEXT AS class_type_name, COUNT(ca.id)::BIGINT
   FROM class_attendances ca JOIN classes c ON c.id = ca.class_id JOIN class_types ct ON ct.id = c.class_type_id
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR ca.student_id = p_student_id)
   GROUP BY c.class_date, ct.id, ct.name ORDER BY c.class_date, ct.name;
 $$;
 
 -- Cancelaciones (013)
 CREATE OR REPLACE FUNCTION public.get_top_students_by_cancellations(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (student_id UUID, student_name TEXT, cancellation_count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT s.id AS student_id, s.full_name AS student_name, COUNT(a.id)::BIGINT AS cancellation_count
   FROM class_absences a JOIN classes c ON c.id = a.class_id JOIN students s ON s.id = a.student_id AND s.deleted_at IS NULL
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR a.student_id = p_student_id)
   GROUP BY s.id, s.full_name ORDER BY cancellation_count DESC LIMIT 15;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_cancellations_by_day(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (day DATE, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT c.class_date AS day, COUNT(a.id)::BIGINT FROM class_absences a JOIN classes c ON c.id = a.class_id
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR a.student_id = p_student_id)
   GROUP BY c.class_date ORDER BY c.class_date;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_cancellations_by_weekday(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (weekday INT, weekday_name TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH names AS (SELECT 0 AS d, 'Domingo' AS n UNION SELECT 1, 'Lunes' UNION SELECT 2, 'Martes' UNION SELECT 3, 'Miércoles' UNION SELECT 4, 'Jueves' UNION SELECT 5, 'Viernes' UNION SELECT 6, 'Sábado')
@@ -600,21 +693,27 @@ RETURNS TABLE (weekday INT, weekday_name TEXT, count BIGINT) LANGUAGE sql STABLE
   FROM class_absences a JOIN classes c ON c.id = a.class_id JOIN names n ON n.d = (EXTRACT(DOW FROM c.class_date::timestamp))::INT
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR a.student_id = p_student_id)
   GROUP BY EXTRACT(DOW FROM c.class_date::timestamp), n.n ORDER BY weekday;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_cancellations_by_time_slot(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (time_slot TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT (c.start_time::TEXT)::TEXT AS time_slot, COUNT(a.id)::BIGINT FROM class_absences a JOIN classes c ON c.id = a.class_id
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR a.student_id = p_student_id)
   GROUP BY c.start_time ORDER BY count DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_teachers_cancellations_ranking(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (teacher_id UUID, teacher_name TEXT, cancellation_count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT t.id AS teacher_id, COALESCE(p.full_name, 'Sin nombre')::TEXT AS teacher_name, COUNT(c.id)::BIGINT AS cancellation_count
@@ -622,13 +721,19 @@ RETURNS TABLE (teacher_id UUID, teacher_name TEXT, cancellation_count BIGINT) LA
   WHERE c.status = 'cancel_by_teacher' AND (p_period_id IS NULL OR c.period_id = p_period_id)
     AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to)
     AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+    AND (p_scope IS NULL OR c.scope = p_scope)
+    AND (p_student_id IS NULL OR EXISTS (
+      SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+      UNION ALL
+      SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+    ))
   GROUP BY t.id, p.full_name ORDER BY cancellation_count DESC LIMIT 15;
 $$;
 
 -- Individual vs shared (014)
 CREATE OR REPLACE FUNCTION public.get_individual_vs_shared_over_time(
   p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL,
-  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL, p_student_id UUID DEFAULT NULL
 )
 RETURNS TABLE (period TEXT, individual_count BIGINT, shared_count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT to_char(c.class_date, 'YYYY-MM') AS period,
@@ -638,12 +743,17 @@ RETURNS TABLE (period TEXT, individual_count BIGINT, shared_count BIGINT) LANGUA
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
     AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+    AND (p_student_id IS NULL OR EXISTS (
+      SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+      UNION ALL
+      SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+    ))
   GROUP BY to_char(c.class_date, 'YYYY-MM') ORDER BY period;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_individual_vs_shared_by_teacher(
   p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL,
-  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL, p_student_id UUID DEFAULT NULL
 )
 RETURNS TABLE (teacher_id UUID, teacher_name TEXT, individual_count BIGINT, shared_count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT t.id AS teacher_id, COALESCE(p.full_name, 'Sin nombre')::TEXT AS teacher_name,
@@ -653,24 +763,30 @@ RETURNS TABLE (teacher_id UUID, teacher_name TEXT, individual_count BIGINT, shar
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from)
     AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
     AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+    AND (p_student_id IS NULL OR EXISTS (
+      SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+      UNION ALL
+      SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+    ))
   GROUP BY t.id, p.full_name ORDER BY (COUNT(*) FILTER (WHERE COALESCE(c.scope, 'individual') = 'individual') + COUNT(*) FILTER (WHERE c.scope = 'shared')) DESC;
 $$;
 
 -- Cancelaciones extendidas (015)
 CREATE OR REPLACE FUNCTION public.get_cancellation_kpis(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (total_cancellations BIGINT, total_classes BIGINT, cancellation_rate_pct NUMERIC, previous_period_cancellations BIGINT, variation_pct NUMERIC, avg_per_teacher NUMERIC, avg_per_student NUMERIC)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   WITH base AS (
-    SELECT (SELECT COUNT(*)::BIGINT FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)) AS absences_count,
-      (SELECT COUNT(*)::BIGINT FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND c.status = 'cancel_by_teacher') AS teacher_cancel_count,
-      (SELECT COUNT(*)::BIGINT FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)) AS total_classes,
-      (SELECT COUNT(DISTINCT c.teacher_id)::BIGINT FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)) AS num_teachers,
-      (SELECT COUNT(DISTINCT a.student_id)::BIGINT FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)) AS students_with_absence
+    SELECT (SELECT COUNT(*)::BIGINT FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR a.student_id = p_student_id)) AS absences_count,
+      (SELECT COUNT(*)::BIGINT FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND c.status = 'cancel_by_teacher' AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR EXISTS (SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id UNION ALL SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id))) AS teacher_cancel_count,
+      (SELECT COUNT(*)::BIGINT FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR EXISTS (SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id UNION ALL SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id))) AS total_classes,
+      (SELECT COUNT(DISTINCT c.teacher_id)::BIGINT FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope)) AS num_teachers,
+      (SELECT COUNT(DISTINCT a.student_id)::BIGINT FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR a.student_id = p_student_id)) AS students_with_absence
   ),
-  prev_period AS (SELECT COUNT(*)::BIGINT AS prev_abs FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND p_date_from IS NOT NULL AND p_date_to IS NOT NULL AND c.class_date >= (p_date_from::date - (p_date_to::date - p_date_from::date + 1)) AND c.class_date < p_date_from::date),
-  prev_teacher AS (SELECT COUNT(*)::BIGINT AS prev_teacher_cancel FROM classes c WHERE c.status = 'cancel_by_teacher' AND (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND p_date_from IS NOT NULL AND p_date_to IS NOT NULL AND c.class_date >= (p_date_from::date - (p_date_to::date - p_date_from::date + 1)) AND c.class_date < p_date_from::date)
+  prev_period AS (SELECT COUNT(*)::BIGINT AS prev_abs FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR a.student_id = p_student_id) AND p_date_from IS NOT NULL AND p_date_to IS NOT NULL AND c.class_date >= (p_date_from::date - (p_date_to::date - p_date_from::date + 1)) AND c.class_date < p_date_from::date),
+  prev_teacher AS (SELECT COUNT(*)::BIGINT AS prev_teacher_cancel FROM classes c WHERE c.status = 'cancel_by_teacher' AND (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR EXISTS (SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id UNION ALL SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id)) AND p_date_from IS NOT NULL AND p_date_to IS NOT NULL AND c.class_date >= (p_date_from::date - (p_date_to::date - p_date_from::date + 1)) AND c.class_date < p_date_from::date)
   SELECT b.absences_count + b.teacher_cancel_count, b.total_classes,
     CASE WHEN b.total_classes > 0 THEN ROUND(((b.absences_count + b.teacher_cancel_count)::NUMERIC / b.total_classes * 100), 1) ELSE 0 END,
     COALESCE(pp.prev_abs, 0) + COALESCE(pt.prev_teacher_cancel, 0),
@@ -681,41 +797,329 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_cancellation_reasons(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (reason_key TEXT, reason_label TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  WITH labels AS (SELECT 'viaje' AS k, 'Viaje' AS lbl UNION SELECT 'enfermedad', 'Enfermedad' UNION SELECT 'trabajo', 'Trabajo' UNION SELECT 'sin_aviso', 'Sin aviso' UNION SELECT 'otro', 'Otro')
+  WITH labels AS (SELECT 'viaje' AS k, 'Viaje' AS lbl UNION SELECT 'enfermedad', 'Enfermedad' UNION SELECT 'trabajo', 'Trabajo' UNION SELECT 'sin_aviso', 'Sin aviso' UNION SELECT 'clima', 'Clima' UNION SELECT 'otro', 'Otro')
   SELECT a.reason_type AS reason_key, l.lbl AS reason_label, COUNT(*)::BIGINT FROM class_absences a JOIN classes c ON c.id = a.class_id JOIN labels l ON l.k = a.reason_type
   WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+    AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR a.student_id = p_student_id)
   GROUP BY a.reason_type, l.lbl ORDER BY COUNT(*) DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_cancellations_by_month(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (period TEXT, month_date DATE, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  WITH abs_by_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, COUNT(a.id)::BIGINT AS cnt FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date)),
-  teacher_cancel_by_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, COUNT(*)::BIGINT AS cnt FROM classes c WHERE c.status = 'cancel_by_teacher' AND (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date))
+  WITH abs_by_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, COUNT(a.id)::BIGINT AS cnt FROM class_absences a JOIN classes c ON c.id = a.class_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR a.student_id = p_student_id) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date)),
+  teacher_cancel_by_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, COUNT(*)::BIGINT AS cnt FROM classes c WHERE c.status = 'cancel_by_teacher' AND (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR EXISTS (SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id UNION ALL SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id)) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date))
   SELECT COALESCE(a.period, t.period) AS period, COALESCE(a.month_date, t.month_date) AS month_date, (COALESCE(a.cnt, 0) + COALESCE(t.cnt, 0))::BIGINT AS count
   FROM abs_by_month a FULL OUTER JOIN teacher_cancel_by_month t ON a.period = t.period AND a.month_date = t.month_date ORDER BY COALESCE(a.month_date, t.month_date);
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_cancellations_by_teacher_over_time(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL, p_scope public.class_scope DEFAULT NULL
 )
 RETURNS TABLE (period TEXT, month_date DATE, teacher_id UUID, teacher_name TEXT, count BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  WITH abs_by_teacher_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, t.id AS teacher_id, COALESCE(p.full_name, 'Sin nombre')::TEXT AS teacher_name, COUNT(a.id)::BIGINT AS cnt FROM class_absences a JOIN classes c ON c.id = a.class_id JOIN teachers t ON t.id = c.teacher_id LEFT JOIN profiles p ON p.id = t.profile_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date), t.id, p.full_name),
-  teacher_cancel_by_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, t.id AS teacher_id, COALESCE(p.full_name, 'Sin nombre')::TEXT AS teacher_name, COUNT(*)::BIGINT AS cnt FROM classes c JOIN teachers t ON t.id = c.teacher_id LEFT JOIN profiles p ON p.id = t.profile_id WHERE c.status = 'cancel_by_teacher' AND (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date), t.id, p.full_name)
+  WITH abs_by_teacher_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, t.id AS teacher_id, COALESCE(p.full_name, 'Sin nombre')::TEXT AS teacher_name, COUNT(a.id)::BIGINT AS cnt FROM class_absences a JOIN classes c ON c.id = a.class_id JOIN teachers t ON t.id = c.teacher_id LEFT JOIN profiles p ON p.id = t.profile_id WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR a.student_id = p_student_id) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date), t.id, p.full_name),
+  teacher_cancel_by_month AS (SELECT to_char(c.class_date, 'YYYY-MM') AS period, date_trunc('month', c.class_date::date)::date AS month_date, t.id AS teacher_id, COALESCE(p.full_name, 'Sin nombre')::TEXT AS teacher_name, COUNT(*)::BIGINT AS cnt FROM classes c JOIN teachers t ON t.id = c.teacher_id LEFT JOIN profiles p ON p.id = t.profile_id WHERE c.status = 'cancel_by_teacher' AND (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_scope IS NULL OR c.scope = p_scope) AND (p_student_id IS NULL OR EXISTS (SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id UNION ALL SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id)) GROUP BY to_char(c.class_date, 'YYYY-MM'), date_trunc('month', c.class_date::date), t.id, p.full_name)
   SELECT COALESCE(a.period, t.period) AS period, COALESCE(a.month_date, t.month_date) AS month_date, COALESCE(a.teacher_id, t.teacher_id) AS teacher_id, COALESCE(a.teacher_name, t.teacher_name) AS teacher_name, (COALESCE(a.cnt, 0) + COALESCE(t.cnt, 0))::BIGINT AS count
   FROM abs_by_teacher_month a FULL OUTER JOIN teacher_cancel_by_month t ON a.period = t.period AND a.month_date = t.month_date AND a.teacher_id = t.teacher_id ORDER BY COALESCE(a.month_date, t.month_date), (COALESCE(a.cnt, 0) + COALESCE(t.cnt, 0)) DESC;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_individual_vs_shared_totals(
-  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL
+  p_period_id UUID DEFAULT NULL, p_date_from DATE DEFAULT NULL, p_date_to DATE DEFAULT NULL, p_teacher_id UUID DEFAULT NULL, p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL
 )
 RETURNS TABLE (individual_total BIGINT, shared_total BIGINT) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT COUNT(*) FILTER (WHERE COALESCE(c.scope, 'individual') = 'individual')::BIGINT, COUNT(*) FILTER (WHERE c.scope = 'shared')::BIGINT
-  FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id);
+  FROM classes c WHERE (p_period_id IS NULL OR c.period_id = p_period_id) AND (p_date_from IS NULL OR c.class_date >= p_date_from) AND (p_date_to IS NULL OR c.class_date <= p_date_to) AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id) AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+    AND (p_student_id IS NULL OR EXISTS (
+      SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+      UNION ALL
+      SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+    ));
+$$;
+
+-- =============================================================================
+-- Dashboard Ejecutivo: Resumen Ejecutivo (022)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.pct_variation(p_current NUMERIC, p_previous NUMERIC)
+RETURNS NUMERIC LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE WHEN COALESCE(p_previous, 0) > 0 THEN ROUND(((p_current - p_previous) / p_previous * 100), 1) ELSE 0 END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_executive_summary_kpis(
+  p_period_id UUID DEFAULT NULL,
+  p_date_from DATE DEFAULT NULL,
+  p_date_to DATE DEFAULT NULL,
+  p_teacher_id UUID DEFAULT NULL,
+  p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL,
+  p_scope public.class_scope DEFAULT NULL
+)
+RETURNS TABLE (
+  active_students_current BIGINT, active_students_previous BIGINT, active_students_variation_pct NUMERIC,
+  classes_current BIGINT, classes_previous BIGINT, classes_variation_pct NUMERIC,
+  teachers_current BIGINT, teachers_previous BIGINT, teachers_variation_pct NUMERIC,
+  cancellations_current BIGINT, cancellations_previous BIGINT, cancellations_variation_pct NUMERIC,
+  hours_current NUMERIC, hours_previous NUMERIC, hours_variation_pct NUMERIC,
+  attendance_rate_current NUMERIC, attendance_rate_previous NUMERIC, attendance_rate_variation_pct NUMERIC,
+  new_students_current BIGINT, new_students_previous BIGINT, new_students_variation_pct NUMERIC
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  WITH prev_range AS (
+    SELECT
+      (p_date_from::date - (p_date_to::date - p_date_from::date + 1)) AS d_from,
+      (p_date_from::date - 1) AS d_to
+    WHERE p_date_from IS NOT NULL AND p_date_to IS NOT NULL
+  ),
+  cur_classes AS (
+    SELECT c.id, c.teacher_id, c.class_date, c.status, c.duration_minutes FROM classes c
+    WHERE (p_period_id IS NULL OR c.period_id = p_period_id)
+      AND (p_date_from IS NULL OR c.class_date >= p_date_from)
+      AND (p_date_to IS NULL OR c.class_date <= p_date_to)
+      AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR EXISTS (
+        SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+        UNION ALL
+        SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+      ))
+  ),
+  prev_classes AS (
+    SELECT c.id, c.teacher_id, c.class_date, c.status, c.duration_minutes FROM classes c, prev_range pr
+    WHERE (p_period_id IS NULL OR c.period_id = p_period_id)
+      AND c.class_date >= pr.d_from AND c.class_date <= pr.d_to
+      AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR EXISTS (
+        SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+        UNION ALL
+        SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+      ))
+  ),
+  cur_agg AS (
+    SELECT
+      (SELECT COUNT(DISTINCT ca.student_id)::BIGINT FROM class_attendances ca WHERE EXISTS (SELECT 1 FROM cur_classes cc WHERE cc.id = ca.class_id)) AS active_students,
+      (SELECT COUNT(*)::BIGINT FROM cur_classes) AS classes_count,
+      (SELECT COUNT(DISTINCT teacher_id)::BIGINT FROM cur_classes) AS teachers_count,
+      (SELECT COUNT(*)::BIGINT FROM cur_classes WHERE status = 'success') AS success_classes,
+      (SELECT COUNT(*)::BIGINT FROM class_attendances ca WHERE EXISTS (SELECT 1 FROM cur_classes cc WHERE cc.id = ca.class_id)) AS attendances_count,
+      (SELECT COALESCE(SUM(duration_minutes), 0)::NUMERIC / 60.0 FROM cur_classes WHERE status = 'success') AS hours,
+      (
+        (SELECT COUNT(*)::BIGINT FROM class_absences a JOIN cur_classes cc ON cc.id = a.class_id
+          WHERE (p_student_id IS NULL OR a.student_id = p_student_id))
+        +
+        (SELECT COUNT(*)::BIGINT FROM cur_classes WHERE status = 'cancel_by_teacher')
+      ) AS cancellations,
+      (SELECT COUNT(*)::BIGINT FROM students s WHERE s.deleted_at IS NULL
+        AND (p_teacher_id IS NULL OR s.teacher_id = p_teacher_id)
+        AND (p_date_from IS NULL OR s.created_at::date >= p_date_from)
+        AND (p_date_to IS NULL OR s.created_at::date <= p_date_to)) AS new_students
+  ),
+  prev_agg AS (
+    SELECT
+      (SELECT COUNT(DISTINCT ca.student_id)::BIGINT FROM class_attendances ca WHERE EXISTS (SELECT 1 FROM prev_classes cc WHERE cc.id = ca.class_id)) AS active_students,
+      (SELECT COUNT(*)::BIGINT FROM prev_classes) AS classes_count,
+      (SELECT COUNT(DISTINCT teacher_id)::BIGINT FROM prev_classes) AS teachers_count,
+      (SELECT COUNT(*)::BIGINT FROM prev_classes WHERE status = 'success') AS success_classes,
+      (SELECT COUNT(*)::BIGINT FROM class_attendances ca WHERE EXISTS (SELECT 1 FROM prev_classes cc WHERE cc.id = ca.class_id)) AS attendances_count,
+      (SELECT COALESCE(SUM(duration_minutes), 0)::NUMERIC / 60.0 FROM prev_classes WHERE status = 'success') AS hours,
+      (
+        (SELECT COUNT(*)::BIGINT FROM class_absences a JOIN prev_classes cc ON cc.id = a.class_id
+          WHERE (p_student_id IS NULL OR a.student_id = p_student_id))
+        +
+        (SELECT COUNT(*)::BIGINT FROM prev_classes WHERE status = 'cancel_by_teacher')
+      ) AS cancellations,
+      (SELECT COUNT(*)::BIGINT FROM students s, prev_range pr WHERE s.deleted_at IS NULL
+        AND (p_teacher_id IS NULL OR s.teacher_id = p_teacher_id)
+        AND s.created_at::date >= pr.d_from AND s.created_at::date <= pr.d_to) AS new_students
+  ),
+  agg AS (
+    SELECT
+      c.active_students AS ac, p.active_students AS ap,
+      c.classes_count AS cc_, p.classes_count AS cp,
+      c.teachers_count AS tc, p.teachers_count AS tp,
+      c.cancellations AS canc_c, p.cancellations AS canc_p,
+      c.hours AS hc, p.hours AS hp,
+      CASE WHEN c.success_classes > 0 THEN ROUND((c.attendances_count::NUMERIC / c.success_classes * 100), 1) ELSE 0 END AS ar_c,
+      CASE WHEN p.success_classes > 0 THEN ROUND((p.attendances_count::NUMERIC / p.success_classes * 100), 1) ELSE 0 END AS ar_p,
+      c.new_students AS ns_c, p.new_students AS ns_p
+    FROM cur_agg c CROSS JOIN prev_agg p
+  )
+  SELECT
+    agg.ac, agg.ap, public.pct_variation(agg.ac, agg.ap),
+    agg.cc_, agg.cp, public.pct_variation(agg.cc_, agg.cp),
+    agg.tc, agg.tp, public.pct_variation(agg.tc, agg.tp),
+    agg.canc_c, agg.canc_p, public.pct_variation(agg.canc_c, agg.canc_p),
+    agg.hc, agg.hp, public.pct_variation(agg.hc, agg.hp),
+    agg.ar_c, agg.ar_p, public.pct_variation(agg.ar_c, agg.ar_p),
+    agg.ns_c, agg.ns_p, public.pct_variation(agg.ns_c, agg.ns_p)
+  FROM agg;
+$$;
+
+-- =============================================================================
+-- Dashboard Ejecutivo: Evolución del negocio unificada (023)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_business_evolution_by_day(
+  p_period_id UUID DEFAULT NULL,
+  p_date_from DATE DEFAULT NULL,
+  p_date_to DATE DEFAULT NULL,
+  p_teacher_id UUID DEFAULT NULL,
+  p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL,
+  p_scope public.class_scope DEFAULT NULL
+)
+RETURNS TABLE (
+  day DATE,
+  classes_count BIGINT,
+  hours NUMERIC,
+  active_students_count BIGINT,
+  new_students_count BIGINT,
+  cancellations_count BIGINT
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  WITH filtered_classes AS (
+    SELECT c.id, c.class_date, c.status, c.duration_minutes FROM classes c
+    WHERE (p_period_id IS NULL OR c.period_id = p_period_id)
+      AND (p_date_from IS NULL OR c.class_date >= p_date_from)
+      AND (p_date_to IS NULL OR c.class_date <= p_date_to)
+      AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR EXISTS (
+        SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+        UNION ALL
+        SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+      ))
+  ),
+  days AS (
+    SELECT generate_series(
+      COALESCE(p_date_from, (SELECT MIN(class_date) FROM classes)),
+      COALESCE(p_date_to, (SELECT MAX(class_date) FROM classes)),
+      '1 day'::interval
+    )::date AS day
+  ),
+  classes_by_day AS (
+    SELECT class_date AS day, COUNT(*)::BIGINT AS classes_count,
+      (COALESCE(SUM(duration_minutes) FILTER (WHERE status = 'success'), 0)::NUMERIC / 60.0) AS hours
+    FROM filtered_classes GROUP BY class_date
+  ),
+  active_by_day AS (
+    SELECT fc.class_date AS day, COUNT(DISTINCT ca.student_id)::BIGINT AS active_students_count
+    FROM class_attendances ca JOIN filtered_classes fc ON fc.id = ca.class_id
+    GROUP BY fc.class_date
+  ),
+  new_students_by_day AS (
+    SELECT s.created_at::date AS day, COUNT(*)::BIGINT AS new_students_count
+    FROM students s
+    WHERE s.deleted_at IS NULL
+      AND (p_teacher_id IS NULL OR s.teacher_id = p_teacher_id)
+      AND (p_date_from IS NULL OR s.created_at::date >= p_date_from)
+      AND (p_date_to IS NULL OR s.created_at::date <= p_date_to)
+    GROUP BY s.created_at::date
+  ),
+  cancellations_by_day AS (
+    SELECT day, SUM(cnt)::BIGINT AS cancellations_count FROM (
+      SELECT c.class_date AS day, COUNT(*) AS cnt
+      FROM class_absences a JOIN filtered_classes c ON c.id = a.class_id
+      WHERE (p_student_id IS NULL OR a.student_id = p_student_id)
+      GROUP BY c.class_date
+      UNION ALL
+      SELECT class_date AS day, COUNT(*) AS cnt FROM filtered_classes WHERE status = 'cancel_by_teacher' GROUP BY class_date
+    ) x GROUP BY day
+  )
+  SELECT
+    d.day,
+    COALESCE(cbd.classes_count, 0),
+    COALESCE(cbd.hours, 0),
+    COALESCE(abd.active_students_count, 0),
+    COALESCE(nsd.new_students_count, 0),
+    COALESCE(ccd.cancellations_count, 0)
+  FROM days d
+  LEFT JOIN classes_by_day cbd ON cbd.day = d.day
+  LEFT JOIN active_by_day abd ON abd.day = d.day
+  LEFT JOIN new_students_by_day nsd ON nsd.day = d.day
+  LEFT JOIN cancellations_by_day ccd ON ccd.day = d.day
+  ORDER BY d.day;
+$$;
+
+-- =============================================================================
+-- Dashboard Ejecutivo: Ranking de profesores unificado (024)
+-- =============================================================================
+
+CREATE OR REPLACE FUNCTION public.get_teacher_ranking_metrics(
+  p_period_id UUID DEFAULT NULL,
+  p_date_from DATE DEFAULT NULL,
+  p_date_to DATE DEFAULT NULL,
+  p_class_type_id UUID DEFAULT NULL,
+  p_student_id UUID DEFAULT NULL,
+  p_scope public.class_scope DEFAULT NULL
+)
+RETURNS TABLE (
+  teacher_id UUID,
+  teacher_name TEXT,
+  classes_count BIGINT,
+  unique_students BIGINT,
+  hours NUMERIC,
+  cancellations_count BIGINT,
+  attendance_pct NUMERIC
+)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  WITH filtered_classes AS (
+    SELECT c.id, c.teacher_id, c.class_date, c.status, c.duration_minutes FROM classes c
+    WHERE (p_period_id IS NULL OR c.period_id = p_period_id)
+      AND (p_date_from IS NULL OR c.class_date >= p_date_from)
+      AND (p_date_to IS NULL OR c.class_date <= p_date_to)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+      AND (p_student_id IS NULL OR EXISTS (
+        SELECT 1 FROM class_attendances ca_f WHERE ca_f.class_id = c.id AND ca_f.student_id = p_student_id
+        UNION ALL
+        SELECT 1 FROM class_absences ab_f WHERE ab_f.class_id = c.id AND ab_f.student_id = p_student_id
+      ))
+  ),
+  agg AS (
+    SELECT fc.teacher_id,
+      COUNT(DISTINCT fc.id)::BIGINT AS classes_count,
+      COUNT(DISTINCT ca.student_id)::BIGINT AS unique_students,
+      (COALESCE(SUM(fc.duration_minutes) FILTER (WHERE fc.status = 'success'), 0)::NUMERIC / 60.0) AS hours,
+      COUNT(DISTINCT fc.id) FILTER (WHERE fc.status = 'success')::BIGINT AS success_classes,
+      COUNT(ca.id)::BIGINT AS total_attendances
+    FROM filtered_classes fc LEFT JOIN class_attendances ca ON ca.class_id = fc.id
+    GROUP BY fc.teacher_id
+  ),
+  cancellations AS (
+    SELECT teacher_id, SUM(cnt)::BIGINT AS cancellations_count FROM (
+      SELECT fc.teacher_id, COUNT(*) AS cnt
+      FROM class_absences a JOIN filtered_classes fc ON fc.id = a.class_id
+      WHERE (p_student_id IS NULL OR a.student_id = p_student_id)
+      GROUP BY fc.teacher_id
+      UNION ALL
+      SELECT teacher_id, COUNT(*) AS cnt FROM filtered_classes WHERE status = 'cancel_by_teacher' GROUP BY teacher_id
+    ) x GROUP BY teacher_id
+  )
+  SELECT
+    a.teacher_id,
+    COALESCE(p.full_name, 'Sin nombre')::TEXT,
+    a.classes_count,
+    a.unique_students,
+    a.hours,
+    COALESCE(c.cancellations_count, 0),
+    CASE WHEN a.success_classes > 0 THEN ROUND((a.total_attendances::NUMERIC / a.success_classes * 100), 1) ELSE 0 END
+  FROM agg a
+  JOIN teachers t ON t.id = a.teacher_id
+  JOIN profiles p ON p.id = t.profile_id
+  LEFT JOIN cancellations c ON c.teacher_id = a.teacher_id
+  ORDER BY a.classes_count DESC;
 $$;
 
 -- =============================================================================

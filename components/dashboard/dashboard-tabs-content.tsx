@@ -1,9 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { SectionCard } from "@/components/dashboard/section-card";
@@ -50,13 +47,6 @@ const ActiveStudentsEvolutionChart = dynamic(
   () =>
     import("@/components/dashboard/charts/active-students-evolution-chart").then(
       (m) => m.ActiveStudentsEvolutionChart
-    ),
-  { loading: chartFallback }
-);
-const StudentsByTeacherChart = dynamic(
-  () =>
-    import("@/components/dashboard/charts/students-by-teacher-chart").then(
-      (m) => m.StudentsByTeacherChart
     ),
   { loading: chartFallback }
 );
@@ -161,19 +151,12 @@ const IndividualVsSharedGlobalChart = dynamic(
   { loading: chartFallback }
 );
 
-const DASHBOARD_TABS = ["kpis", "cancelaciones", "asistencias", "insights"] as const;
-type DashboardTab = (typeof DASHBOARD_TABS)[number];
-
-function isDashboardTab(value: string | null): value is DashboardTab {
-  return value != null && (DASHBOARD_TABS as readonly string[]).includes(value);
-}
 import type {
   DashboardKpis,
   DayCount,
   WeekdayCount,
   TimeSlotCount,
   TeacherPerformanceRow,
-  StudentsByTeacherRow,
   ClassTypePerformanceRow,
   AttendanceByClassTypeOverTimeRow,
   StudentCancellationRow,
@@ -208,10 +191,6 @@ import {
   ClipboardList,
   Layers,
   TrendingUp,
-  BarChart3,
-  UserMinus,
-  ClipboardCheck,
-  Lightbulb,
 } from "lucide-react";
 
 export type DashboardTabsContentProps = {
@@ -224,7 +203,6 @@ export type DashboardTabsContentProps = {
   newStudentsByMonth: NewStudentsByMonth[];
   activeStudentsEvolution: ActiveStudentsEvolutionRow[];
   teachersPerformance: TeacherPerformanceRow[];
-  studentsByTeacher: StudentsByTeacherRow[];
   classTypePerformance: ClassTypePerformanceRow[];
   attendanceByClassTypeOverTime: AttendanceByClassTypeOverTimeRow[];
   topStudentsCancellations: StudentCancellationRow[];
@@ -246,21 +224,6 @@ export type DashboardTabsContentProps = {
 
 export function DashboardTabsContent(props: DashboardTabsContentProps) {
   const { kpis, topTimeSlot, topWeekday, topClassType, topTeacherByAvg } = props;
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const activeTab: DashboardTab = isDashboardTab(tabParam) ? tabParam : "kpis";
-
-  const onTabChange = useCallback(
-    (value: string) => {
-      const next = new URLSearchParams(searchParams.toString());
-      if (value === "kpis") next.delete("tab");
-      else next.set("tab", value);
-      const qs = next.toString();
-      router.replace(`/admin/dashboard${qs ? `?${qs}` : ""}`, { scroll: false });
-    },
-    [router, searchParams]
-  );
 
   const classesByDayTable = dayCountTable(props.classesByDay);
   const attendanceByDayTable = dayCountTable(props.attendanceByDay);
@@ -270,78 +233,61 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
   const cancelTimeTable = timeSlotCountTable(props.cancellationsByTimeSlot);
 
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-      <TabsList className="mb-4 flex w-full flex-wrap gap-1 bg-muted p-1 lg:mb-6">
-        <TabsTrigger value="kpis" className="flex items-center gap-1.5">
-          <BarChart3 className="h-4 w-4 shrink-0" />
-          KPIs
-        </TabsTrigger>
-        <TabsTrigger value="cancelaciones" className="flex items-center gap-1.5">
-          <UserMinus className="h-4 w-4 shrink-0" />
-          Cancelaciones y comportamiento
-        </TabsTrigger>
-        <TabsTrigger value="asistencias" className="flex items-center gap-1.5">
-          <ClipboardCheck className="h-4 w-4 shrink-0" />
-          Asistencias
-        </TabsTrigger>
-        <TabsTrigger value="insights" className="flex items-center gap-1.5">
-          <Lightbulb className="h-4 w-4 shrink-0" />
-          Insights del negocio
-        </TabsTrigger>
-      </TabsList>
+    <div className="w-full space-y-10">
+      {/* ===================== KPIs ===================== */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">KPIs principales</h2>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <KpiCard title="Total alumnos" value={kpis?.total_students ?? 0} icon={Users} />
+          <KpiCard
+            title="Alumnos activos"
+            value={kpis?.active_students ?? 0}
+            subtitle="En el período seleccionado"
+            icon={UserCheck}
+          />
+          <KpiCard title="Alumnos inactivos" value={kpis?.inactive_students ?? 0} icon={UserX} />
+          <KpiCard
+            title="En riesgo de abandono"
+            value={kpis?.at_risk_students ?? 0}
+            subtitle="Sin asistir 14+ días"
+            icon={AlertTriangle}
+          />
+          <KpiCard
+            title="Profesores activos"
+            value={kpis?.total_teachers ?? 0}
+            icon={GraduationCap}
+          />
+          <KpiCard title="Clases en período" value={kpis?.total_classes ?? 0} icon={Calendar} />
+          <KpiCard
+            title="Total asistencias"
+            value={kpis?.total_attendances ?? 0}
+            icon={ClipboardList}
+          />
+          <KpiCard
+            title="Prom. alumnos por clase"
+            value={kpis ? kpis.avg_attendances_per_class.toFixed(1) : "0"}
+            icon={TrendingUp}
+          />
+          <KpiCard title="Tipos de clase" value={kpis?.class_types_count ?? 0} icon={Layers} />
+          <KpiCard
+            title="Tasa de actividad"
+            value={kpis ? `${kpis.activity_rate.toFixed(1)}%` : "0%"}
+            subtitle="Activos / total alumnos"
+          />
+        </div>
+      </section>
 
-      <TabsContent value="kpis" className="mt-0 space-y-6">
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">KPIs principales</h2>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <KpiCard title="Total alumnos" value={kpis?.total_students ?? 0} icon={Users} />
-            <KpiCard
-              title="Alumnos activos"
-              value={kpis?.active_students ?? 0}
-              subtitle="Últimos 15 días"
-              icon={UserCheck}
-            />
-            <KpiCard title="Alumnos inactivos" value={kpis?.inactive_students ?? 0} icon={UserX} />
-            <KpiCard
-              title="En riesgo de abandono"
-              value={kpis?.at_risk_students ?? 0}
-              subtitle="Sin asistir 30+ días"
-              icon={AlertTriangle}
-            />
-            <KpiCard
-              title="Profesores activos"
-              value={kpis?.total_teachers ?? 0}
-              icon={GraduationCap}
-            />
-            <KpiCard title="Clases en período" value={kpis?.total_classes ?? 0} icon={Calendar} />
-            <KpiCard
-              title="Total asistencias"
-              value={kpis?.total_attendances ?? 0}
-              icon={ClipboardList}
-            />
-            <KpiCard
-              title="Prom. alumnos por clase"
-              value={kpis ? kpis.avg_attendances_per_class.toFixed(1) : "0"}
-              icon={TrendingUp}
-            />
-            <KpiCard title="Tipos de clase" value={kpis?.class_types_count ?? 0} icon={Layers} />
-            <KpiCard
-              title="Tasa de actividad"
-              value={kpis ? `${kpis.activity_rate.toFixed(1)}%` : "0%"}
-              subtitle="Activos / total alumnos"
-            />
-          </div>
-        </section>
-      </TabsContent>
+      {/* ============ Cancelaciones y comportamiento ============ */}
+      <section className="space-y-6">
+        <h2 className="text-lg font-semibold">Cancelaciones y comportamiento</h2>
 
-      <TabsContent value="cancelaciones" className="mt-0 space-y-6">
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground">KPIs</h2>
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">KPIs</h3>
           <CancellationKpisCards data={props.cancellationKpis} />
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Tendencia en el tiempo</h2>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Tendencia en el tiempo</h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Cancelaciones por mes"
@@ -362,10 +308,10 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
               <CancellationsByTeacherOverTimeChart data={props.cancellationsByTeacherOverTime} />
             </SectionCard>
           </div>
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Rankings</h2>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Rankings</h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Alumnos que más clases cancelaron"
@@ -382,10 +328,10 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
               <TeachersCancellationsChart data={props.teachersCancellationsRanking} />
             </SectionCard>
           </div>
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Motivos de cancelación</h2>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Motivos de cancelación</h3>
           <SectionCard
             title="Motivos de cancelación (faltas de alumnos)"
             description="Categoría «Otro» mostrada de forma independiente"
@@ -397,10 +343,10 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           >
             <CancellationReasonsChart data={props.cancellationReasons} />
           </SectionCard>
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Patrones (día y hora)</h2>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Patrones (día y hora)</h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Día con más cancelaciones"
@@ -421,12 +367,12 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
               <CancellationsByTimeSlotChart data={props.cancellationsByTimeSlot} />
             </SectionCard>
           </div>
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">
             Clases individuales vs grupales
-          </h2>
+          </h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Distribución global"
@@ -454,12 +400,15 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           >
             <IndividualVsSharedOverTimeStackedAreaChart data={props.individualVsSharedOverTime} />
           </SectionCard>
-        </section>
-      </TabsContent>
+        </div>
+      </section>
 
-      <TabsContent value="asistencias" className="mt-0 space-y-6">
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Actividad de clases</h2>
+      {/* ===================== Asistencias ===================== */}
+      <section className="space-y-6">
+        <h2 className="text-lg font-semibold">Asistencias</h2>
+
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Actividad de clases</h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Clases por día"
@@ -498,10 +447,10 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
               <AttendanceByTimeSlotChart data={props.attendanceByTimeSlot} />
             </SectionCard>
           </div>
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Análisis de alumnos</h2>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Análisis de alumnos</h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Activos / Inactivos / Riesgo"
@@ -528,17 +477,11 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
             >
               <ActiveStudentsEvolutionChart data={props.activeStudentsEvolution} />
             </SectionCard>
-            <SectionCard
-              title="Distribución de alumnos por profesor"
-              chartSummary={`Distribución entre ${props.studentsByTeacher.length} profesores.`}
-            >
-              <StudentsByTeacherChart data={props.studentsByTeacher} />
-            </SectionCard>
           </div>
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Rendimiento de profesores</h2>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Rendimiento de profesores</h3>
           <div className="grid gap-4 lg:grid-cols-3">
             <SectionCard
               title="Profesores con más clases"
@@ -575,10 +518,10 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           <SectionCard title="Ranking detallado" description="Ordenable por columnas">
             <TeachersRankingTable data={props.teachersPerformance} />
           </SectionCard>
-        </section>
+        </div>
 
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-muted-foreground">Análisis por tipo de clase</h2>
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-muted-foreground">Análisis por tipo de clase</h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Tipo de clase con más asistencia"
@@ -600,10 +543,12 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           >
             <AttendanceByClassTypeStackedChart data={props.attendanceByClassTypeOverTime} />
           </SectionCard>
-        </section>
-      </TabsContent>
+        </div>
+      </section>
 
-      <TabsContent value="insights" className="mt-0">
+      {/* ===================== Insights del negocio ===================== */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Insights del negocio</h2>
         <BusinessInsights
           kpis={kpis}
           topTimeSlot={topTimeSlot}
@@ -611,7 +556,7 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           topClassType={topClassType}
           topTeacherByAvg={topTeacherByAvg}
         />
-      </TabsContent>
-    </Tabs>
+      </section>
+    </div>
   );
 }
