@@ -54,7 +54,7 @@ export async function createTeacher(input: unknown) {
   if (teacherError) {
     throw new Error(
       teacherError.message.includes("foreign key")
-        ? "No se pudo crear el profesor (perfil o tablas). ¿Ejecutaste run-all-migrations.sql en Supabase?"
+        ? "No se pudo crear el profesor (perfil o tablas). ¿Ejecutaste supabase/schema.sql en Supabase?"
         : teacherError.message
     );
   }
