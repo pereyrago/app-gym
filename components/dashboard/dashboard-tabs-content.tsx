@@ -8,11 +8,15 @@ import { BusinessInsights } from "@/components/dashboard/business-insights";
 const chartFallback = () => <Skeleton className="h-[280px] w-full rounded-md" />;
 
 const ClassesByDayChart = dynamic(
-  () => import("@/components/dashboard/charts/classes-by-day-chart").then((m) => m.ClassesByDayChart),
+  () =>
+    import("@/components/dashboard/charts/classes-by-day-chart").then((m) => m.ClassesByDayChart),
   { loading: chartFallback }
 );
 const AttendanceByDayChart = dynamic(
-  () => import("@/components/dashboard/charts/attendance-by-day-chart").then((m) => m.AttendanceByDayChart),
+  () =>
+    import("@/components/dashboard/charts/attendance-by-day-chart").then(
+      (m) => m.AttendanceByDayChart
+    ),
   { loading: chartFallback }
 );
 const AttendanceByWeekdayChart = dynamic(
@@ -115,6 +119,13 @@ const CancellationReasonsChart = dynamic(
     ),
   { loading: chartFallback }
 );
+const CancellationsBySourceDonut = dynamic(
+  () =>
+    import("@/components/dashboard/charts/cancellations-by-source-donut").then(
+      (m) => m.CancellationsBySourceDonut
+    ),
+  { loading: chartFallback }
+);
 const CancellationsByMonthChart = dynamic(
   () =>
     import("@/components/dashboard/charts/cancellations-by-month-chart").then(
@@ -168,6 +179,7 @@ import type {
   ActiveStudentsEvolutionRow,
   CancellationKpisRow,
   CancellationReasonRow,
+  CancellationSourceRow,
   CancellationsByMonthRow,
   CancellationsByTeacherOverTimeRow,
   IndividualVsSharedTotalsRow,
@@ -211,6 +223,7 @@ export type DashboardTabsContentProps = {
   teachersCancellationsRanking: TeacherCancellationRow[];
   cancellationKpis: CancellationKpisRow | null;
   cancellationReasons: CancellationReasonRow[];
+  cancellationsBySource: CancellationSourceRow[];
   cancellationsByMonth: CancellationsByMonthRow[];
   cancellationsByTeacherOverTime: CancellationsByTeacherOverTimeRow[];
   individualVsSharedOverTime: IndividualVsSharedOverTimeRow[];
@@ -332,17 +345,30 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
 
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-muted-foreground">Motivos de cancelación</h3>
-          <SectionCard
-            title="Motivos de cancelación (faltas de alumnos)"
-            description="Categoría «Otro» mostrada de forma independiente"
-            chartSummary={genericCountSummary(
-              props.cancellationReasons,
-              "Sin motivos de cancelación registrados.",
-              "faltas con motivo"
-            )}
-          >
-            <CancellationReasonsChart data={props.cancellationReasons} />
-          </SectionCard>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SectionCard
+              title="Cancelaciones por quién"
+              description="Alumno / Profesor / Clima / Otros"
+              chartSummary={genericCountSummary(
+                props.cancellationsBySource,
+                "Sin cancelaciones registradas.",
+                "cancelaciones"
+              )}
+            >
+              <CancellationsBySourceDonut data={props.cancellationsBySource} />
+            </SectionCard>
+            <SectionCard
+              title="Motivos de cancelación (faltas de alumnos)"
+              description="Categoría «Otro» mostrada de forma independiente"
+              chartSummary={genericCountSummary(
+                props.cancellationReasons,
+                "Sin motivos de cancelación registrados.",
+                "faltas con motivo"
+              )}
+            >
+              <CancellationReasonsChart data={props.cancellationReasons} />
+            </SectionCard>
+          </div>
         </div>
 
         <div className="space-y-4">

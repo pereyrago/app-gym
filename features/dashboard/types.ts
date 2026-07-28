@@ -122,6 +122,12 @@ export type CancellationReasonRow = {
   count: number;
 };
 
+/** Una porción de la dona "Cancelaciones por quién" (Bloque 5), get_cancellations_by_source. */
+export type CancellationSourceRow = {
+  source: "alumno" | "profesor" | "clima" | "otros";
+  count: number;
+};
+
 /** Cancelaciones por mes (tendencia). */
 export type CancellationsByMonthRow = {
   period: string;

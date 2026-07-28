@@ -25,6 +25,7 @@ import {
   getTeachersCancellationsRanking,
   getCancellationKpis,
   getCancellationReasons,
+  getCancellationsBySource,
   getCancellationsByMonth,
   getCancellationsByTeacherOverTime,
   getIndividualVsSharedOverTime,
@@ -102,6 +103,7 @@ export default async function AdminDashboardPage({
     teachersCancellationsRanking,
     cancellationKpis,
     cancellationReasons,
+    cancellationsBySource,
     cancellationsByMonth,
     cancellationsByTeacherOverTime,
     individualVsSharedOverTime,
@@ -131,6 +133,7 @@ export default async function AdminDashboardPage({
     getTeachersCancellationsRanking(supabase, filters),
     getCancellationKpis(supabase, filters),
     getCancellationReasons(supabase, filters),
+    getCancellationsBySource(supabase, filters),
     getCancellationsByMonth(supabase, filters),
     getCancellationsByTeacherOverTime(supabase, filters),
     getIndividualVsSharedOverTime(supabase, filters),
@@ -185,32 +188,33 @@ export default async function AdminDashboardPage({
 
       <Suspense fallback={<Skeleton className="h-96 w-full rounded-lg" />}>
         <DashboardTabsContent
-        kpis={kpis}
-        classesByDay={classesByDay}
-        attendanceByDay={attendanceByDay}
-        attendanceByWeekday={attendanceByWeekday}
-        attendanceByTimeSlot={attendanceByTimeSlot}
-        studentsActivity={studentsActivity}
-        newStudentsByMonth={newStudentsByMonth}
-        activeStudentsEvolution={activeStudentsEvolution}
-        teachersPerformance={teachersPerformance}
-        classTypePerformance={classTypePerformance}
-        attendanceByClassTypeOverTime={attendanceByClassTypeOverTime}
-        topStudentsCancellations={topStudentsCancellations}
-        cancellationsByWeekday={cancellationsByWeekday}
-        cancellationsByTimeSlot={cancellationsByTimeSlot}
-        teachersCancellationsRanking={teachersCancellationsRanking}
-        cancellationKpis={cancellationKpis}
-        cancellationReasons={cancellationReasons}
-        cancellationsByMonth={cancellationsByMonth}
-        cancellationsByTeacherOverTime={cancellationsByTeacherOverTime}
-        individualVsSharedOverTime={individualVsSharedOverTime}
-        individualVsSharedByTeacher={individualVsSharedByTeacher}
-        individualVsSharedTotals={individualVsSharedTotals}
-        topTimeSlot={topTimeSlot}
-        topWeekday={topWeekday}
-        topClassType={topClassType}
-        topTeacherByAvg={topTeacherByAvg}
+          kpis={kpis}
+          classesByDay={classesByDay}
+          attendanceByDay={attendanceByDay}
+          attendanceByWeekday={attendanceByWeekday}
+          attendanceByTimeSlot={attendanceByTimeSlot}
+          studentsActivity={studentsActivity}
+          newStudentsByMonth={newStudentsByMonth}
+          activeStudentsEvolution={activeStudentsEvolution}
+          teachersPerformance={teachersPerformance}
+          classTypePerformance={classTypePerformance}
+          attendanceByClassTypeOverTime={attendanceByClassTypeOverTime}
+          topStudentsCancellations={topStudentsCancellations}
+          cancellationsByWeekday={cancellationsByWeekday}
+          cancellationsByTimeSlot={cancellationsByTimeSlot}
+          teachersCancellationsRanking={teachersCancellationsRanking}
+          cancellationKpis={cancellationKpis}
+          cancellationReasons={cancellationReasons}
+          cancellationsBySource={cancellationsBySource}
+          cancellationsByMonth={cancellationsByMonth}
+          cancellationsByTeacherOverTime={cancellationsByTeacherOverTime}
+          individualVsSharedOverTime={individualVsSharedOverTime}
+          individualVsSharedByTeacher={individualVsSharedByTeacher}
+          individualVsSharedTotals={individualVsSharedTotals}
+          topTimeSlot={topTimeSlot}
+          topWeekday={topWeekday}
+          topClassType={topClassType}
+          topTeacherByAvg={topTeacherByAvg}
         />
       </Suspense>
     </div>

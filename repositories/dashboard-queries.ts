@@ -18,6 +18,7 @@ import type {
   IndividualVsSharedByTeacherRow,
   CancellationKpisRow,
   CancellationReasonRow,
+  CancellationSourceRow,
   CancellationsByMonthRow,
   CancellationsByTeacherOverTimeRow,
   IndividualVsSharedTotalsRow,
@@ -410,6 +411,24 @@ export async function getCancellationReasons(
   return (data ?? []).map((r: Record<string, unknown>) => ({
     reason_key: String(r.reason_key ?? ""),
     reason_label: String(r.reason_label ?? ""),
+    count: Number(r.count ?? 0),
+  }));
+}
+
+export async function getCancellationsBySource(
+  supabase: SupabaseClient,
+  filters: DashboardFilters
+): Promise<CancellationSourceRow[]> {
+  const { data, error } = await supabase.rpc(
+    "get_cancellations_by_source",
+    cancellationRpcParams(filters)
+  );
+  if (error) {
+    console.error("get_cancellations_by_source", error);
+    return [];
+  }
+  return (data ?? []).map((r: Record<string, unknown>) => ({
+    source: String(r.source ?? "otros") as CancellationSourceRow["source"],
     count: Number(r.count ?? 0),
   }));
 }
