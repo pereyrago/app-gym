@@ -23,15 +23,32 @@ import type {
   IndividualVsSharedTotalsRow,
 } from "@/features/dashboard/types";
 
-function toRpcParams(f: DashboardFilters) {
+/**
+ * Params base compartidos por la mayoría de las RPC del dashboard.
+ * p_scope filtra por classes.scope ('individual' | 'shared'), alimentado
+ * por el filtro "Tipo de clase" de la UI (filters.classMode).
+ */
+export function toRpcParams(f: DashboardFilters) {
   return {
-    p_period_id: f.periodId ?? null,
     p_date_from: f.dateFrom ?? null,
     p_date_to: f.dateTo ?? null,
     p_teacher_id: f.teacherId ?? null,
-    p_class_type_id: f.classTypeId ?? null,
+    p_student_id: f.studentId ?? null,
+    p_scope: f.classMode ?? null,
   };
 }
+
+/** Igual que toRpcParams, pero sin p_scope (para individual_vs_shared_*, donde ese filtro sería contradictorio). */
+export function toRpcParamsNoScope(f: DashboardFilters) {
+  return {
+    p_date_from: f.dateFrom ?? null,
+    p_date_to: f.dateTo ?? null,
+    p_teacher_id: f.teacherId ?? null,
+    p_student_id: f.studentId ?? null,
+  };
+}
+
+const cancellationRpcParams = toRpcParams;
 
 export async function getDashboardKpis(
   supabase: SupabaseClient,
@@ -177,10 +194,10 @@ export async function getTeachersPerformanceSummary(
   filters: DashboardFilters
 ): Promise<TeacherPerformanceRow[]> {
   const { data, error } = await supabase.rpc("get_teachers_performance_summary", {
-    p_period_id: filters.periodId ?? null,
     p_date_from: filters.dateFrom ?? null,
     p_date_to: filters.dateTo ?? null,
-    p_class_type_id: filters.classTypeId ?? null,
+    p_student_id: filters.studentId ?? null,
+    p_scope: filters.classMode ?? null,
   });
   if (error) {
     console.error("get_teachers_performance_summary", error);
@@ -220,10 +237,11 @@ export async function getClassTypePerformanceSummary(
   filters: DashboardFilters
 ): Promise<ClassTypePerformanceRow[]> {
   const { data, error } = await supabase.rpc("get_class_type_performance_summary", {
-    p_period_id: filters.periodId ?? null,
     p_date_from: filters.dateFrom ?? null,
     p_date_to: filters.dateTo ?? null,
     p_teacher_id: filters.teacherId ?? null,
+    p_student_id: filters.studentId ?? null,
+    p_scope: filters.classMode ?? null,
   });
   if (error) {
     console.error("get_class_type_performance_summary", error);
@@ -242,10 +260,11 @@ export async function getAttendanceByClassTypeOverTime(
   filters: DashboardFilters
 ): Promise<AttendanceByClassTypeOverTimeRow[]> {
   const { data, error } = await supabase.rpc("get_attendance_by_class_type_over_time", {
-    p_period_id: filters.periodId ?? null,
     p_date_from: filters.dateFrom ?? null,
     p_date_to: filters.dateTo ?? null,
     p_teacher_id: filters.teacherId ?? null,
+    p_student_id: filters.studentId ?? null,
+    p_scope: filters.classMode ?? null,
   });
   if (error) {
     console.error("get_attendance_by_class_type_over_time", error);
@@ -257,13 +276,6 @@ export async function getAttendanceByClassTypeOverTime(
     count: Number(r.count ?? 0),
   }));
 }
-
-const cancellationRpcParams = (f: DashboardFilters) => ({
-  p_period_id: f.periodId ?? null,
-  p_date_from: f.dateFrom ?? null,
-  p_date_to: f.dateTo ?? null,
-  p_teacher_id: f.teacherId ?? null,
-});
 
 export async function getTopStudentsByCancellations(
   supabase: SupabaseClient,
@@ -448,7 +460,7 @@ export async function getIndividualVsSharedTotals(
 ): Promise<IndividualVsSharedTotalsRow | null> {
   const { data, error } = await supabase.rpc(
     "get_individual_vs_shared_totals",
-    toRpcParams(filters)
+    toRpcParamsNoScope(filters)
   );
   if (error) {
     console.error("get_individual_vs_shared_totals", error);
@@ -468,7 +480,7 @@ export async function getIndividualVsSharedOverTime(
 ): Promise<IndividualVsSharedOverTimeRow[]> {
   const { data, error } = await supabase.rpc(
     "get_individual_vs_shared_over_time",
-    toRpcParams(filters)
+    toRpcParamsNoScope(filters)
   );
   if (error) {
     console.error("get_individual_vs_shared_over_time", error);
@@ -487,7 +499,7 @@ export async function getIndividualVsSharedByTeacher(
 ): Promise<IndividualVsSharedByTeacherRow[]> {
   const { data, error } = await supabase.rpc(
     "get_individual_vs_shared_by_teacher",
-    toRpcParams(filters)
+    toRpcParamsNoScope(filters)
   );
   if (error) {
     console.error("get_individual_vs_shared_by_teacher", error);

@@ -110,3 +110,26 @@ export async function softDeleteStudent(id: string) {
 export async function deleteStudent(id: string) {
   await softDeleteStudent(id);
 }
+
+const ALL_STUDENTS_CACHE_TAG = "all-students";
+
+async function getStudentsUncached(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<Student[]> {
+  const { data, error } = await supabase
+    .from("students")
+    .select("id, full_name")
+    .is("deleted_at", null)
+    .order("full_name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Student[];
+}
+
+/** Lista todos los alumnos no eliminados, para selects/filtros (ej. dashboard). */
+export async function getStudents(): Promise<Student[]> {
+  const supabase = await createClient();
+  return unstable_cache(() => getStudentsUncached(supabase), ["all-students"], {
+    revalidate: 60,
+    tags: [ALL_STUDENTS_CACHE_TAG],
+  })();
+}

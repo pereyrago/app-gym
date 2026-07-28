@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -13,90 +13,176 @@ import {
 import { Input } from "@/components/ui/input";
 import type { DashboardFilters } from "@/features/dashboard/types";
 
-type Period = { id: string; name: string };
 type Teacher = { id: string; full_name: string | null };
-type ClassType = { id: string; name: string };
+type Student = { id: string; full_name: string | null };
 
 type DashboardFiltersProps = {
   filters: DashboardFilters;
-  periods: Period[];
   teachers: Teacher[];
-  classTypes: ClassType[];
+  students: Student[];
 };
 
-export function DashboardFiltersClient({
-  filters,
-  periods,
-  teachers,
-  classTypes,
-}: DashboardFiltersProps) {
+const DATE_PRESETS = [
+  { id: "today", label: "Hoy" },
+  { id: "week", label: "Esta semana" },
+  { id: "month", label: "Este mes" },
+  { id: "quarter", label: "Trimestre" },
+  { id: "year", label: "Año" },
+  { id: "custom", label: "Personalizado" },
+] as const;
+
+type DatePresetId = (typeof DATE_PRESETS)[number]["id"];
+
+const CLASS_MODES = [
+  { id: "individual", label: "Personalizado" },
+  { id: "shared", label: "Grupal" },
+] as const;
+
+function toDateInputValue(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Calcula { from, to } (YYYY-MM-DD) para un preset dado.
+ * Todos los rangos van "a la fecha" (desde el inicio del período hasta hoy),
+ * excepto "today" que es un único día.
+ */
+function computeRangeForPreset(preset: DatePresetId): { from: string; to: string } | null {
+  if (preset === "custom") return null;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let from = today;
+
+  switch (preset) {
+    case "today": {
+      from = today;
+      break;
+    }
+    case "week": {
+      const day = today.getDay(); // 0 = domingo, 1 = lunes, ...
+      const diffToMonday = day === 0 ? 6 : day - 1;
+      from = new Date(today);
+      from.setDate(today.getDate() - diffToMonday);
+      break;
+    }
+    case "month": {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+      break;
+    }
+    case "quarter": {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      from = new Date(today.getFullYear(), quarterStartMonth, 1);
+      break;
+    }
+    case "year": {
+      from = new Date(today.getFullYear(), 0, 1);
+      break;
+    }
+  }
+
+  return {
+    from: toDateInputValue(from),
+    to: toDateInputValue(today),
+  };
+}
+
+function resolveActivePreset(searchParams: URLSearchParams): DatePresetId {
+  const explicit = searchParams.get("date_preset") as DatePresetId | null;
+  if (explicit && DATE_PRESETS.some((p) => p.id === explicit)) return explicit;
+  return "custom";
+}
+
+export function DashboardFiltersClient({ filters, teachers, students }: DashboardFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const setParam = useCallback(
-    (key: string, value: string | null) => {
+  const activePreset = useMemo(() => resolveActivePreset(searchParams), [searchParams]);
+
+  const setParams = useCallback(
+    (entries: Record<string, string | null>) => {
       const next = new URLSearchParams(searchParams.toString());
-      if (value) next.set(key, value);
-      else next.delete(key);
+      for (const [key, value] of Object.entries(entries)) {
+        if (value) next.set(key, value);
+        else next.delete(key);
+      }
       router.replace(`/admin/dashboard?${next.toString()}`, { scroll: false });
     },
     [router, searchParams]
   );
 
+  const handlePresetChange = useCallback(
+    (preset: DatePresetId) => {
+      const range = computeRangeForPreset(preset);
+      if (range) {
+        setParams({ date_preset: preset, date_from: range.from, date_to: range.to });
+      } else {
+        setParams({ date_preset: preset });
+      }
+    },
+    [setParams]
+  );
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
       <div className="space-y-2">
-        <Label htmlFor="period" className="text-[13px]">
-          Período
+        <Label htmlFor="date_preset" className="text-[13px]">
+          Periodo
         </Label>
-        <Select
-          value={filters.periodId ?? "all"}
-          onValueChange={(v) => setParam("period_id", v === "all" ? null : v)}
-        >
-          <SelectTrigger id="period" className="h-9">
-            <SelectValue placeholder="Todos" />
+        <Select value={activePreset} onValueChange={(v) => handlePresetChange(v as DatePresetId)}>
+          <SelectTrigger id="date_preset" className="h-9">
+            <SelectValue placeholder="Periodo" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {periods.map((p) => (
+            {DATE_PRESETS.map((p) => (
               <SelectItem key={p.id} value={p.id}>
-                {p.name}
+                {p.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="date_from" className="text-[13px]">
-          Desde
-        </Label>
-        <Input
-          id="date_from"
-          type="date"
-          className="h-9"
-          value={filters.dateFrom ?? ""}
-          onChange={(e) => setParam("date_from", e.target.value || null)}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="date_to" className="text-[13px]">
-          Hasta
-        </Label>
-        <Input
-          id="date_to"
-          type="date"
-          className="h-9"
-          value={filters.dateTo ?? ""}
-          onChange={(e) => setParam("date_to", e.target.value || null)}
-        />
-      </div>
+
+      {activePreset === "custom" && (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="date_from" className="text-[13px]">
+              Desde
+            </Label>
+            <Input
+              id="date_from"
+              type="date"
+              className="h-9"
+              value={filters.dateFrom ?? ""}
+              onChange={(e) => setParams({ date_from: e.target.value || null })}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="date_to" className="text-[13px]">
+              Hasta
+            </Label>
+            <Input
+              id="date_to"
+              type="date"
+              className="h-9"
+              value={filters.dateTo ?? ""}
+              onChange={(e) => setParams({ date_to: e.target.value || null })}
+            />
+          </div>
+        </>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="teacher" className="text-[13px]">
           Profesor
         </Label>
         <Select
           value={filters.teacherId ?? "all"}
-          onValueChange={(v) => setParam("teacher_id", v === "all" ? null : v)}
+          onValueChange={(v) => setParams({ teacher_id: v === "all" ? null : v })}
         >
           <SelectTrigger id="teacher" className="h-9">
             <SelectValue placeholder="Todos" />
@@ -111,22 +197,45 @@ export function DashboardFiltersClient({
           </SelectContent>
         </Select>
       </div>
+
       <div className="space-y-2">
-        <Label htmlFor="class_type" className="text-[13px]">
-          Tipo de clase
+        <Label htmlFor="student" className="text-[13px]">
+          Alumno
         </Label>
         <Select
-          value={filters.classTypeId ?? "all"}
-          onValueChange={(v) => setParam("class_type_id", v === "all" ? null : v)}
+          value={filters.studentId ?? "all"}
+          onValueChange={(v) => setParams({ student_id: v === "all" ? null : v })}
         >
-          <SelectTrigger id="class_type" className="h-9">
+          <SelectTrigger id="student" className="h-9">
             <SelectValue placeholder="Todos" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos</SelectItem>
-            {classTypes.map((ct) => (
-              <SelectItem key={ct.id} value={ct.id}>
-                {ct.name}
+            {students.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.full_name || "Sin nombre"}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="class_mode" className="text-[13px]">
+          Tipo de clase
+        </Label>
+        <Select
+          value={filters.classMode ?? "all"}
+          onValueChange={(v) => setParams({ class_mode: v === "all" ? null : v })}
+        >
+          <SelectTrigger id="class_mode" className="h-9">
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            {CLASS_MODES.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.label}
               </SelectItem>
             ))}
           </SelectContent>

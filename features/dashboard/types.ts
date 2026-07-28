@@ -1,10 +1,10 @@
-/** Filtros globales del dashboard (periodo, rango de fechas, profesor, tipo de clase). */
+/** Filtros globales del dashboard (rango de fechas, profesor, alumno, modalidad de clase). */
 export type DashboardFilters = {
-  periodId: string | null;
   dateFrom: string | null; // YYYY-MM-DD
   dateTo: string | null;
   teacherId: string | null;
-  classTypeId: string | null;
+  studentId: string | null;
+  classMode: "individual" | "shared" | null;
 };
 
 /** Una fila de KPIs devuelta por get_dashboard_kpis. */
@@ -151,4 +151,6 @@ export type DashboardRpcParams = {
   p_date_to?: string | null;
   p_teacher_id?: string | null;
   p_class_type_id?: string | null;
+  p_student_id?: string | null;
+  p_scope?: "individual" | "shared" | null;
 };
