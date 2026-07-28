@@ -41,7 +41,7 @@ export function BusinessInsights({
     {
       title: "Alumnos en riesgo de abandono",
       value: String(kpis.at_risk_students),
-      subtitle: "Sin asistir en 30+ días",
+      subtitle: "Sin asistir en 14+ días",
     },
     {
       title: "Tipos de clase disponibles",
