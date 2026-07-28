@@ -36,6 +36,7 @@ import {
   getExecutiveSummaryKpis,
   getBusinessEvolutionByDay,
   getTeacherRankingMetrics,
+  getStudentRankingMetrics,
 } from "@/repositories/dashboard-executive-queries";
 import type { DashboardFilters } from "@/features/dashboard/types";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
@@ -104,6 +105,7 @@ export default async function AdminDashboardPage({
     cancellationKpis,
     cancellationReasons,
     cancellationsBySource,
+    studentRanking,
     cancellationsByMonth,
     cancellationsByTeacherOverTime,
     individualVsSharedOverTime,
@@ -134,6 +136,7 @@ export default async function AdminDashboardPage({
     getCancellationKpis(supabase, filters),
     getCancellationReasons(supabase, filters),
     getCancellationsBySource(supabase, filters),
+    getStudentRankingMetrics(supabase, filters),
     getCancellationsByMonth(supabase, filters),
     getCancellationsByTeacherOverTime(supabase, filters),
     getIndividualVsSharedOverTime(supabase, filters),
@@ -206,6 +209,7 @@ export default async function AdminDashboardPage({
           cancellationKpis={cancellationKpis}
           cancellationReasons={cancellationReasons}
           cancellationsBySource={cancellationsBySource}
+        studentRanking={studentRanking}
           cancellationsByMonth={cancellationsByMonth}
           cancellationsByTeacherOverTime={cancellationsByTeacherOverTime}
           individualVsSharedOverTime={individualVsSharedOverTime}

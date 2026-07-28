@@ -4,6 +4,7 @@ import type {
   ExecutiveSummaryKpis,
   BusinessEvolutionRow,
   TeacherRankingRow,
+  StudentRankingRow,
 } from "@/features/dashboard/types";
 import { toRpcParams } from "@/repositories/dashboard-queries";
 
@@ -99,4 +100,37 @@ export async function getTeacherRankingMetrics(
     cancellations_count: Number(r.cancellations_count ?? 0),
     attendance_pct: Number(r.attendance_pct ?? 0),
   }));
+}
+
+/** Omite p_student_id: es un ranking entre alumnos, filtrar a "uno solo" no tendría sentido. */
+export async function getStudentRankingMetrics(
+  supabase: SupabaseClient,
+  filters: DashboardFilters
+): Promise<StudentRankingRow[]> {
+  const { data, error } = await supabase.rpc("get_student_ranking_metrics", {
+    p_date_from: filters.dateFrom ?? null,
+    p_date_to: filters.dateTo ?? null,
+    p_teacher_id: filters.teacherId ?? null,
+    p_scope: filters.classMode ?? null,
+  });
+  if (error) {
+    console.error("get_student_ranking_metrics", error);
+    return [];
+  }
+  const todayMs = Date.now();
+  return (data ?? []).map((r: Record<string, unknown>) => {
+    const lastClassDate = r.last_class_date != null ? String(r.last_class_date) : null;
+    const daysSinceLastClass = lastClassDate
+      ? Math.floor((todayMs - new Date(lastClassDate).getTime()) / (24 * 60 * 60 * 1000))
+      : null;
+    return {
+      student_id: String(r.student_id ?? ""),
+      student_name: String(r.student_name ?? ""),
+      classes_count: Number(r.classes_count ?? 0),
+      cancellations_count: Number(r.cancellations_count ?? 0),
+      last_class_date: lastClassDate,
+      created_at: String(r.created_at ?? ""),
+      days_since_last_class: daysSinceLastClass,
+    };
+  });
 }

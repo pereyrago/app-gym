@@ -189,6 +189,17 @@ export type TeacherRankingRow = {
   attendance_pct: number;
 };
 
+/** Ranking de alumnos (Bloque 7), get_student_ranking_metrics. days_since_last_class es derivado en el repo. */
+export type StudentRankingRow = {
+  student_id: string;
+  student_name: string;
+  classes_count: number;
+  cancellations_count: number;
+  last_class_date: string | null;
+  created_at: string;
+  days_since_last_class: number | null;
+};
+
 /** Opciones para llamar a las RPCs (filtros opcionales). */
 export type DashboardRpcParams = {
   p_period_id?: string | null;
