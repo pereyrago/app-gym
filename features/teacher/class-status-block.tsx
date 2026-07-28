@@ -32,6 +32,7 @@ const REASON_OPTIONS: { value: CancellationReasonType; label: string }[] = [
   { value: "enfermedad", label: "Enfermedad" },
   { value: "trabajo", label: "Trabajo" },
   { value: "sin_aviso", label: "Sin aviso" },
+  { value: "clima", label: "Clima" },
   { value: "otro", label: "Otro" },
 ];
 

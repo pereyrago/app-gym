@@ -144,6 +144,7 @@ const CANCELLATION_REASON_LABELS: Record<string, string> = {
   enfermedad: "Enfermedad",
   trabajo: "Trabajo",
   sin_aviso: "Sin aviso",
+  clima: "Clima",
   otro: "Otro",
 };
 
@@ -185,7 +186,7 @@ export async function updateClassStatusAction(
     cancellation_reason_observations,
   } = input;
   if (status !== "success") {
-    const validTypes = ["viaje", "enfermedad", "trabajo", "sin_aviso", "otro"];
+    const validTypes = ["viaje", "enfermedad", "trabajo", "sin_aviso", "clima", "otro"];
     if (!cancellation_reason_type || !validTypes.includes(cancellation_reason_type)) {
       throw new Error("Seleccioná un motivo de cancelación.");
     }

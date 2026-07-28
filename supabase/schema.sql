@@ -117,7 +117,7 @@ CREATE TABLE public.class_absences (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   class_id UUID NOT NULL REFERENCES public.classes(id) ON DELETE CASCADE,
   student_id UUID NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
-  reason_type TEXT NOT NULL CHECK (reason_type IN ('viaje', 'enfermedad', 'trabajo', 'sin_aviso', 'otro')),
+  reason_type TEXT NOT NULL CHECK (reason_type IN ('viaje', 'enfermedad', 'trabajo', 'sin_aviso', 'otro', 'clima')),
   reason_other TEXT,
   observations TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

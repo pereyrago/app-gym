@@ -9,7 +9,13 @@ export type ClassStatus = "success" | "cancel_by_student" | "cancel_by_teacher";
 export type ClassScope = "individual" | "shared";
 
 /** Tipo de motivo de cancelación */
-export type CancellationReasonType = "viaje" | "enfermedad" | "trabajo" | "sin_aviso" | "otro";
+export type CancellationReasonType =
+  | "viaje"
+  | "enfermedad"
+  | "trabajo"
+  | "sin_aviso"
+  | "clima"
+  | "otro";
 
 export interface Database {
   public: {
