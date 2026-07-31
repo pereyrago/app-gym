@@ -100,6 +100,7 @@ CREATE TABLE public.classes (
 CREATE INDEX idx_classes_teacher_id ON public.classes(teacher_id);
 CREATE INDEX idx_classes_period_id ON public.classes(period_id);
 CREATE INDEX idx_classes_created_at ON public.classes(created_at);
+CREATE INDEX IF NOT EXISTS idx_classes_teacher_scope_date ON public.classes (teacher_id, scope, class_date);
 
 -- class_attendances
 CREATE TABLE public.class_attendances (
@@ -1167,7 +1168,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 -- =============================================================================
--- 026: Ranking de alumnos (Bloque 7 del Dashboard Ejecutivo)
+-- 026/027: Ranking de alumnos (Bloque 7 del Dashboard Ejecutivo)
 -- =============================================================================
 CREATE OR REPLACE FUNCTION public.get_student_ranking_metrics(
   p_date_from DATE DEFAULT NULL,
@@ -1185,45 +1186,57 @@ RETURNS TABLE (
   created_at DATE
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  WITH scope_classes AS (
-    SELECT c.id, c.class_date FROM classes c
-    WHERE (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
-      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
-      AND (p_scope IS NULL OR c.scope = p_scope)
-  ),
-  period_classes AS (
-    SELECT id, class_date FROM scope_classes
-    WHERE (p_date_from IS NULL OR class_date >= p_date_from)
-      AND (p_date_to IS NULL OR class_date <= p_date_to)
-  ),
-  last_attendance AS (
-    SELECT ca.student_id, MAX(sc.class_date) AS last_class_date
-    FROM class_attendances ca JOIN scope_classes sc ON sc.id = ca.class_id
-    GROUP BY ca.student_id
+  WITH student_base AS (
+    SELECT s.id, s.full_name, s.created_at
+    FROM students s
+    WHERE s.deleted_at IS NULL
+      AND (p_teacher_id IS NULL OR s.teacher_id = p_teacher_id)
   ),
   period_attendance AS (
     SELECT ca.student_id, COUNT(DISTINCT ca.class_id)::BIGINT AS classes_count
-    FROM class_attendances ca JOIN period_classes pc ON pc.id = ca.class_id
+    FROM class_attendances ca
+    INNER JOIN student_base sb ON sb.id = ca.student_id
+    INNER JOIN classes c ON c.id = ca.class_id
+    WHERE (p_date_from IS NULL OR c.class_date >= p_date_from)
+      AND (p_date_to IS NULL OR c.class_date <= p_date_to)
+      AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
     GROUP BY ca.student_id
   ),
   period_cancellations AS (
     SELECT a.student_id, COUNT(*)::BIGINT AS cancellations_count
-    FROM class_absences a JOIN period_classes pc ON pc.id = a.class_id
+    FROM class_absences a
+    INNER JOIN student_base sb ON sb.id = a.student_id
+    INNER JOIN classes c ON c.id = a.class_id
+    WHERE (p_date_from IS NULL OR c.class_date >= p_date_from)
+      AND (p_date_to IS NULL OR c.class_date <= p_date_to)
+      AND (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
     GROUP BY a.student_id
+  ),
+  last_attendance AS (
+    SELECT ca.student_id, MAX(c.class_date) AS last_class_date
+    FROM class_attendances ca
+    INNER JOIN student_base sb ON sb.id = ca.student_id
+    INNER JOIN classes c ON c.id = ca.class_id
+    WHERE (p_teacher_id IS NULL OR c.teacher_id = p_teacher_id)
+      AND (p_class_type_id IS NULL OR c.class_type_id = p_class_type_id)
+      AND (p_scope IS NULL OR c.scope = p_scope)
+    GROUP BY ca.student_id
   )
   SELECT
-    s.id,
-    s.full_name::TEXT,
+    sb.id,
+    sb.full_name::TEXT,
     COALESCE(pa.classes_count, 0),
     COALESCE(pca.cancellations_count, 0),
     la.last_class_date,
-    s.created_at::DATE
-  FROM students s
-  LEFT JOIN last_attendance la ON la.student_id = s.id
-  LEFT JOIN period_attendance pa ON pa.student_id = s.id
-  LEFT JOIN period_cancellations pca ON pca.student_id = s.id
-  WHERE s.deleted_at IS NULL
-    AND (p_teacher_id IS NULL OR s.teacher_id = p_teacher_id)
+    sb.created_at::DATE
+  FROM student_base sb
+  LEFT JOIN last_attendance la ON la.student_id = sb.id
+  LEFT JOIN period_attendance pa ON pa.student_id = sb.id
+  LEFT JOIN period_cancellations pca ON pca.student_id = sb.id
   ORDER BY COALESCE(pa.classes_count, 0) DESC;
 $$;
 

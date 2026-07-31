@@ -1,49 +1,14 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { subDays } from "date-fns";
-import { createClient } from "@/lib/supabase/server";
 import { toAppTzDateString } from "@/lib/app-timezone";
 import { getCurrentPeriod } from "@/repositories/periods";
 import { getTeachersWithProfiles } from "@/repositories/teachers";
 import { getStudents } from "@/repositories/students";
-import {
-  getDashboardKpis,
-  getClassesByDay,
-  getAttendanceByDay,
-  getAttendanceByWeekday,
-  getAttendanceByTimeSlot,
-  getStudentsActivitySummary,
-  getNewStudentsByMonth,
-  getActiveStudentsEvolution,
-  getTeachersPerformanceSummary,
-  getStudentsByTeacher,
-  getClassTypePerformanceSummary,
-  getAttendanceByClassTypeOverTime,
-  getTopStudentsByCancellations,
-  getCancellationsByWeekday,
-  getCancellationsByTimeSlot,
-  getTeachersCancellationsRanking,
-  getCancellationKpis,
-  getCancellationReasons,
-  getCancellationsBySource,
-  getCancellationsByMonth,
-  getCancellationsByTeacherOverTime,
-  getIndividualVsSharedOverTime,
-  getIndividualVsSharedByTeacher,
-  getIndividualVsSharedTotals,
-} from "@/repositories/dashboard-queries";
-import {
-  getExecutiveSummaryKpis,
-  getBusinessEvolutionByDay,
-  getTeacherRankingMetrics,
-  getStudentRankingMetrics,
-} from "@/repositories/dashboard-executive-queries";
 import type { DashboardFilters } from "@/features/dashboard/types";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { DashboardFiltersClient } from "@/components/dashboard/dashboard-filters";
-import { ExecutiveSummaryKpisSection } from "@/components/dashboard/executive-summary-kpis";
-import { BusinessPerformanceSection } from "@/components/dashboard/business-performance-section";
-import { DashboardTabsContent } from "@/components/dashboard/dashboard-tabs-content";
+import { DashboardPreviewSection } from "@/app/admin/dashboard/dashboard-sections";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft } from "lucide-react";
@@ -60,13 +25,26 @@ async function getDefaultDateRange() {
   };
 }
 
+const previewFallback = (
+  <div className="space-y-6">
+    <Skeleton className="h-32 w-full rounded-lg" />
+    <Skeleton className="h-96 w-full rounded-lg" />
+  </div>
+);
+
 export default async function AdminDashboardPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const defaultRange = await getDefaultDateRange();
+
+  const [defaultRange, teachers, students] = await Promise.all([
+    getDefaultDateRange(),
+    getTeachersWithProfiles(),
+    getStudents(),
+  ]);
+
   const filters: DashboardFilters = {
     dateFrom: typeof params.date_from === "string" ? params.date_from : defaultRange.dateFrom,
     dateTo: typeof params.date_to === "string" ? params.date_to : defaultRange.dateTo,
@@ -77,77 +55,6 @@ export default async function AdminDashboardPage({
         ? params.class_mode
         : null,
   };
-
-  const supabase = await createClient();
-
-  const [
-    teachers,
-    students,
-    executiveSummaryKpis,
-    businessEvolution,
-    teacherRanking,
-    kpis,
-    classesByDay,
-    attendanceByDay,
-    attendanceByWeekday,
-    attendanceByTimeSlot,
-    studentsActivity,
-    newStudentsByMonth,
-    activeStudentsEvolution,
-    teachersPerformance,
-    studentsByTeacher,
-    classTypePerformance,
-    attendanceByClassTypeOverTime,
-    topStudentsCancellations,
-    cancellationsByWeekday,
-    cancellationsByTimeSlot,
-    teachersCancellationsRanking,
-    cancellationKpis,
-    cancellationReasons,
-    cancellationsBySource,
-    studentRanking,
-    cancellationsByMonth,
-    cancellationsByTeacherOverTime,
-    individualVsSharedOverTime,
-    individualVsSharedByTeacher,
-    individualVsSharedTotals,
-  ] = await Promise.all([
-    getTeachersWithProfiles(),
-    getStudents(),
-    getExecutiveSummaryKpis(supabase, filters),
-    getBusinessEvolutionByDay(supabase, filters),
-    getTeacherRankingMetrics(supabase, filters),
-    getDashboardKpis(supabase, filters),
-    getClassesByDay(supabase, filters),
-    getAttendanceByDay(supabase, filters),
-    getAttendanceByWeekday(supabase, filters),
-    getAttendanceByTimeSlot(supabase, filters),
-    getStudentsActivitySummary(supabase, filters.dateFrom, filters.dateTo),
-    getNewStudentsByMonth(supabase, filters.dateFrom, filters.dateTo),
-    getActiveStudentsEvolution(supabase, filters),
-    getTeachersPerformanceSummary(supabase, filters),
-    getStudentsByTeacher(supabase),
-    getClassTypePerformanceSummary(supabase, filters),
-    getAttendanceByClassTypeOverTime(supabase, filters),
-    getTopStudentsByCancellations(supabase, filters),
-    getCancellationsByWeekday(supabase, filters),
-    getCancellationsByTimeSlot(supabase, filters),
-    getTeachersCancellationsRanking(supabase, filters),
-    getCancellationKpis(supabase, filters),
-    getCancellationReasons(supabase, filters),
-    getCancellationsBySource(supabase, filters),
-    getStudentRankingMetrics(supabase, filters),
-    getCancellationsByMonth(supabase, filters),
-    getCancellationsByTeacherOverTime(supabase, filters),
-    getIndividualVsSharedOverTime(supabase, filters),
-    getIndividualVsSharedByTeacher(supabase, filters),
-    getIndividualVsSharedTotals(supabase, filters),
-  ]);
-
-  const topTimeSlot = attendanceByTimeSlot[0]?.time_slot ?? null;
-  const topWeekday = attendanceByWeekday[0]?.weekday_name ?? null;
-  const topClassType = classTypePerformance[0]?.class_type_name ?? null;
-  const topTeacherByAvg = teachersPerformance[0]?.teacher_name ?? null;
 
   const teacherOptions = teachers.map((t) => ({
     id: t.id,
@@ -169,57 +76,14 @@ export default async function AdminDashboardPage({
         <DashboardHeader />
       </div>
 
-      <Suspense fallback={<Skeleton className="h-32 w-full rounded-lg" />}>
-        <DashboardFiltersClient
-          filters={filters}
-          teachers={teacherOptions}
-          students={studentOptions}
-        />
-      </Suspense>
+      <DashboardFiltersClient
+        filters={filters}
+        teachers={teacherOptions}
+        students={studentOptions}
+      />
 
-      <Suspense fallback={<Skeleton className="h-32 w-full rounded-lg" />}>
-        <ExecutiveSummaryKpisSection data={executiveSummaryKpis} />
-      </Suspense>
-
-      <Suspense fallback={<Skeleton className="h-96 w-full rounded-lg" />}>
-        <BusinessPerformanceSection
-          businessEvolution={businessEvolution}
-          teacherRanking={teacherRanking}
-          studentsByTeacher={studentsByTeacher}
-        />
-      </Suspense>
-
-      <Suspense fallback={<Skeleton className="h-96 w-full rounded-lg" />}>
-        <DashboardTabsContent
-          kpis={kpis}
-          classesByDay={classesByDay}
-          attendanceByDay={attendanceByDay}
-          attendanceByWeekday={attendanceByWeekday}
-          attendanceByTimeSlot={attendanceByTimeSlot}
-          studentsActivity={studentsActivity}
-          newStudentsByMonth={newStudentsByMonth}
-          activeStudentsEvolution={activeStudentsEvolution}
-          teachersPerformance={teachersPerformance}
-          classTypePerformance={classTypePerformance}
-          attendanceByClassTypeOverTime={attendanceByClassTypeOverTime}
-          topStudentsCancellations={topStudentsCancellations}
-          cancellationsByWeekday={cancellationsByWeekday}
-          cancellationsByTimeSlot={cancellationsByTimeSlot}
-          teachersCancellationsRanking={teachersCancellationsRanking}
-          cancellationKpis={cancellationKpis}
-          cancellationReasons={cancellationReasons}
-          cancellationsBySource={cancellationsBySource}
-        studentRanking={studentRanking}
-          cancellationsByMonth={cancellationsByMonth}
-          cancellationsByTeacherOverTime={cancellationsByTeacherOverTime}
-          individualVsSharedOverTime={individualVsSharedOverTime}
-          individualVsSharedByTeacher={individualVsSharedByTeacher}
-          individualVsSharedTotals={individualVsSharedTotals}
-          topTimeSlot={topTimeSlot}
-          topWeekday={topWeekday}
-          topClassType={topClassType}
-          topTeacherByAvg={topTeacherByAvg}
-        />
+      <Suspense fallback={previewFallback}>
+        <DashboardPreviewSection filters={filters} />
       </Suspense>
     </div>
   );

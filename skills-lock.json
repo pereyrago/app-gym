@@ -19,6 +19,12 @@
       "skillPath": "supabase/SKILL.md",
       "computedHash": "c0f5d2375d88424f3ceeafdc17dc6ada0f80007f75acbf3de5c981f8d788d1fb"
     },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/supabase-postgres-best-practices/SKILL.md",
+      "computedHash": "128fac78002d916c8ca908245d398e634f540d8bcf20915b2b2359aeb18eba59"
+    },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",

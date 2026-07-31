@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -62,7 +63,6 @@ const TeacherPerformanceBars = dynamic(
   { loading: chartFallback }
 );
 import { TeachersRankingTable } from "@/components/dashboard/teachers-ranking-table";
-import { StudentsRankingTable } from "@/components/dashboard/students-ranking-table";
 const ClassTypePerformanceChart = dynamic(
   () =>
     import("@/components/dashboard/charts/class-type-performance-chart").then(
@@ -181,7 +181,6 @@ import type {
   CancellationKpisRow,
   CancellationReasonRow,
   CancellationSourceRow,
-  StudentRankingRow,
   CancellationsByMonthRow,
   CancellationsByTeacherOverTimeRow,
   IndividualVsSharedTotalsRow,
@@ -226,7 +225,8 @@ export type DashboardTabsContentProps = {
   cancellationKpis: CancellationKpisRow | null;
   cancellationReasons: CancellationReasonRow[];
   cancellationsBySource: CancellationSourceRow[];
-  studentRanking: StudentRankingRow[];
+  /** Slot streamed aparte (RPC pesada) para no bloquear el resto del detalle. */
+  studentRankingSlot: ReactNode;
   cancellationsByMonth: CancellationsByMonthRow[];
   cancellationsByTeacherOverTime: CancellationsByTeacherOverTimeRow[];
   individualVsSharedOverTime: IndividualVsSharedOverTimeRow[];
@@ -507,9 +507,7 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
               <ActiveStudentsEvolutionChart data={props.activeStudentsEvolution} />
             </SectionCard>
           </div>
-          <SectionCard title="Ranking de alumnos" description="Ordenable por columnas">
-            <StudentsRankingTable data={props.studentRanking} />
-          </SectionCard>
+          {props.studentRankingSlot}
         </div>
 
         <div className="space-y-4">

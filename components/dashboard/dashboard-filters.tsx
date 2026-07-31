@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -37,6 +37,8 @@ const CLASS_MODES = [
   { id: "individual", label: "Personalizado" },
   { id: "shared", label: "Grupal" },
 ] as const;
+
+const DATE_DEBOUNCE_MS = 400;
 
 function toDateInputValue(date: Date): string {
   const y = date.getFullYear();
@@ -103,6 +105,21 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
 
   const activePreset = useMemo(() => resolveActivePreset(searchParams), [searchParams]);
 
+  const [dateFromDraft, setDateFromDraft] = useState(filters.dateFrom ?? "");
+  const [dateToDraft, setDateToDraft] = useState(filters.dateTo ?? "");
+  const dateDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setDateFromDraft(filters.dateFrom ?? "");
+    setDateToDraft(filters.dateTo ?? "");
+  }, [filters.dateFrom, filters.dateTo]);
+
+  useEffect(() => {
+    return () => {
+      if (dateDebounceRef.current) clearTimeout(dateDebounceRef.current);
+    };
+  }, []);
+
   const setParams = useCallback(
     (entries: Record<string, string | null>) => {
       const next = new URLSearchParams(searchParams.toString());
@@ -115,10 +132,26 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
     [router, searchParams]
   );
 
+  const scheduleDateParams = useCallback(
+    (nextFrom: string, nextTo: string) => {
+      if (dateDebounceRef.current) clearTimeout(dateDebounceRef.current);
+      dateDebounceRef.current = setTimeout(() => {
+        setParams({
+          date_from: nextFrom || null,
+          date_to: nextTo || null,
+        });
+      }, DATE_DEBOUNCE_MS);
+    },
+    [setParams]
+  );
+
   const handlePresetChange = useCallback(
     (preset: DatePresetId) => {
+      if (dateDebounceRef.current) clearTimeout(dateDebounceRef.current);
       const range = computeRangeForPreset(preset);
       if (range) {
+        setDateFromDraft(range.from);
+        setDateToDraft(range.to);
         setParams({ date_preset: preset, date_from: range.from, date_to: range.to });
       } else {
         setParams({ date_preset: preset });
@@ -157,8 +190,12 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
               id="date_from"
               type="date"
               className="h-9"
-              value={filters.dateFrom ?? ""}
-              onChange={(e) => setParams({ date_from: e.target.value || null })}
+              value={dateFromDraft}
+              onChange={(e) => {
+                const value = e.target.value;
+                setDateFromDraft(value);
+                scheduleDateParams(value, dateToDraft);
+              }}
             />
           </div>
           <div className="space-y-2">
@@ -169,8 +206,12 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
               id="date_to"
               type="date"
               className="h-9"
-              value={filters.dateTo ?? ""}
-              onChange={(e) => setParams({ date_to: e.target.value || null })}
+              value={dateToDraft}
+              onChange={(e) => {
+                const value = e.target.value;
+                setDateToDraft(value);
+                scheduleDateParams(dateFromDraft, value);
+              }}
             />
           </div>
         </>
