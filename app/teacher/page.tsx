@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { getMyTeacherId, getMyTeacherSlug, getMyTeacherName } from "@/lib/teacher";
 import { getPeriods, getCurrentPeriod } from "@/repositories/periods";
-import { getClassesByTeacherAndPeriod } from "@/repositories/classes";
+import {
+  getClassesByTeacherAndPeriod,
+  getStudentPeriodClassesWithAttendance,
+} from "@/repositories/classes";
 import { getClassTypes } from "@/repositories/class-types";
+import { getStudentsByTeacher } from "@/repositories/students";
 import { TeacherClassesList } from "@/features/teacher/teacher-classes-list";
 import { CreateStudentDialog } from "@/features/teacher/create-student-dialog";
 import { CreateClassDialog } from "@/features/teacher/create-class-dialog";
@@ -13,10 +17,10 @@ import { Users, UsersRound } from "lucide-react";
 export default async function TeacherDashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ periodId?: string }>;
+  searchParams: Promise<{ periodId?: string; studentId?: string }>;
 }) {
   const teacherId = await getMyTeacherId();
-  const { periodId } = await searchParams;
+  const { periodId, studentId } = await searchParams;
 
   if (!teacherId) {
     return (
@@ -26,19 +30,28 @@ export default async function TeacherDashboardPage({
     );
   }
 
-  const [periods, currentPeriod, classTypesResult, publicSlug, teacherName] = await Promise.all([
-    getPeriods(),
-    getCurrentPeriod(),
-    getClassTypes().catch(() => [] as Awaited<ReturnType<typeof getClassTypes>>),
-    getMyTeacherSlug(),
-    getMyTeacherName(),
-  ]);
+  const [periods, currentPeriod, classTypesResult, publicSlug, teacherName, students] =
+    await Promise.all([
+      getPeriods(),
+      getCurrentPeriod(),
+      getClassTypes().catch(() => [] as Awaited<ReturnType<typeof getClassTypes>>),
+      getMyTeacherSlug(),
+      getMyTeacherName(),
+      getStudentsByTeacher(teacherId).catch(
+        () => [] as Awaited<ReturnType<typeof getStudentsByTeacher>>
+      ),
+    ]);
   const classTypes = Array.isArray(classTypesResult) ? classTypesResult : [];
   const selectedPeriodId = periodId ?? currentPeriod?.id ?? periods[0]?.id ?? null;
+  const selectedStudentId = studentId ?? null;
   let classes: Awaited<ReturnType<typeof getClassesByTeacherAndPeriod>> = [];
   if (selectedPeriodId) {
     try {
-      classes = await getClassesByTeacherAndPeriod(teacherId, selectedPeriodId);
+      classes = selectedStudentId
+        ? (await getStudentPeriodClassesWithAttendance(selectedStudentId, selectedPeriodId)).map(
+            (row) => row.class
+          )
+        : await getClassesByTeacherAndPeriod(teacherId, selectedPeriodId);
     } catch (e) {
       console.error("[teacher] Error loading classes:", e);
     }
@@ -88,6 +101,8 @@ export default async function TeacherDashboardPage({
         teacherId={teacherId}
         periods={periods}
         selectedPeriodId={selectedPeriodId}
+        students={students}
+        selectedStudentId={selectedStudentId}
         classes={classes}
       />
     </div>

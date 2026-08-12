@@ -37,12 +37,16 @@ export function formatTimeForDisplay(timeStr: string): string {
  */
 export function formatClassDate(
   dateStr: string,
-  pattern: string = "d MMM",
+  pattern: string = "EEE. d 'de' MMM.",
   locale: typeof es = es
 ): string {
   const parts = dateStr.split("-").map(Number);
   const [y, m, day] = parts;
   if (y == null || m == null || day == null) return dateStr;
+
   const utcNoon = new Date(Date.UTC(y, m - 1, day, 12, 0, 0));
-  return formatInTimeZone(utcNoon, APP_TIMEZONE, pattern, { locale });
+
+  const formatted = formatInTimeZone(utcNoon, APP_TIMEZONE, pattern, { locale });
+
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }

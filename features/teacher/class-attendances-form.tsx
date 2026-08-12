@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   setAttendancesAction,
   setAttendancesWithAbsencesAction,
-  cancelClassByTeacherAction,
 } from "@/app/teacher/classes/[classId]/actions";
 import { confirmStudentAction, rejectStudentAction } from "@/app/teacher/students/actions";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useTransition } from "react";
 import { Info, Loader2, Search } from "lucide-react";
@@ -90,10 +88,6 @@ export function ClassAttendancesForm({
     studentName: string;
     detail: AbsenceDetail;
   } | null>(null);
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReasonType, setCancelReasonType] = useState<CancellationReasonType | "">("");
-  const [cancelReasonOther, setCancelReasonOther] = useState("");
-  const [cancelObservations, setCancelObservations] = useState("");
   const [absenceDialogOpen, setAbsenceDialogOpen] = useState(false);
   const [removedForAbsenceDialog, setRemovedForAbsenceDialog] = useState<string[]>([]);
   const [absentReasons, setAbsentReasons] = useState<
@@ -168,40 +162,6 @@ export function ClassAttendancesForm({
       toast({
         title: "Error",
         description: e instanceof Error ? e.message : "No se pudieron guardar",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleConfirmCancelByTeacher() {
-    if (saving) return;
-    if (!cancelReasonType) {
-      toast({ title: "Seleccioná un motivo de cancelación", variant: "destructive" });
-      return;
-    }
-    if (cancelReasonType === "otro" && !cancelReasonOther.trim()) {
-      toast({ title: "Escribí el motivo en el campo Otro", variant: "destructive" });
-      return;
-    }
-    setSaving(true);
-    try {
-      await cancelClassByTeacherAction(classId, {
-        cancellation_reason_type: cancelReasonType,
-        cancellation_reason_other: cancelReasonType === "otro" ? cancelReasonOther.trim() : null,
-        cancellation_reason_observations: cancelObservations.trim() || null,
-      });
-      toast({ title: "Clase cancelada por el profesor" });
-      setCancelDialogOpen(false);
-      setCancelReasonType("");
-      setCancelReasonOther("");
-      setCancelObservations("");
-      router.refresh();
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: e instanceof Error ? e.message : "No se pudo cancelar",
         variant: "destructive",
       });
     } finally {
@@ -413,91 +373,10 @@ export function ClassAttendancesForm({
       {canEdit && (
         <div className="flex flex-wrap gap-2">
           <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? "Guardando…" : "Guardar asistencias"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setCancelDialogOpen(true)}
-            disabled={saving}
-          >
-            Cancelar clase
+            {saving ? "Guardando…" : "Guardar"}
           </Button>
         </div>
       )}
-
-      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent className="sm:max-w-md" aria-describedby="cancel-reason-desc">
-          <DialogHeader>
-            <DialogTitle>Cancelar clase</DialogTitle>
-          </DialogHeader>
-          <div id="cancel-reason-desc" className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              La clase quedará cancelada por el profesor. Los alumnos no tendrán registro de falta.
-              Indicá el motivo (obligatorio).
-            </p>
-            <div className="space-y-2">
-              <Label>Motivo</Label>
-              <div className="flex flex-wrap gap-2">
-                {REASON_OPTIONS.map((opt) => (
-                  <Button
-                    key={opt.value}
-                    type="button"
-                    variant={cancelReasonType === opt.value ? "secondary" : "outline"}
-                    size="sm"
-                    className="text-[12px]"
-                    onClick={() => {
-                      setCancelReasonType(opt.value);
-                      if (opt.value !== "otro") setCancelReasonOther("");
-                    }}
-                  >
-                    {opt.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            {cancelReasonType === "otro" && (
-              <div className="space-y-1">
-                <Label htmlFor="cancel-reason-other">Especificar (obligatorio)</Label>
-                <Input
-                  id="cancel-reason-other"
-                  value={cancelReasonOther}
-                  onChange={(e) => setCancelReasonOther(e.target.value)}
-                  placeholder="Escribí el motivo"
-                  className="text-sm"
-                  maxLength={300}
-                />
-              </div>
-            )}
-            <div className="space-y-1">
-              <Label htmlFor="cancel-obs">Observaciones (opcional)</Label>
-              <Textarea
-                id="cancel-obs"
-                value={cancelObservations}
-                onChange={(e) => setCancelObservations(e.target.value)}
-                placeholder="Ej.: reprogramar la semana que viene"
-                className="min-h-[60px] resize-y text-sm"
-                maxLength={500}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={saving}>
-              Volver
-            </Button>
-            <Button onClick={handleConfirmCancelByTeacher} disabled={saving}>
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Cancelando…
-                </>
-              ) : (
-                "Cancelar clase"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={cancelReasonDialogOpen} onOpenChange={setCancelReasonDialogOpen}>
         <DialogContent className="sm:max-w-md">

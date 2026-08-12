@@ -19,13 +19,15 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { formatClassDate } from "@/lib/app-timezone";
-import type { Period } from "@/types";
+import type { Period, Student } from "@/types";
 import type { ClassWithType } from "@/types";
 
 interface TeacherClassesListProps {
   teacherId: string;
   periods: Period[];
   selectedPeriodId: string | null;
+  students: Student[];
+  selectedStudentId: string | null;
   classes: ClassWithType[];
 }
 
@@ -33,6 +35,8 @@ export function TeacherClassesList({
   teacherId,
   periods,
   selectedPeriodId,
+  students,
+  selectedStudentId,
   classes,
 }: TeacherClassesListProps) {
   const router = useRouter();
@@ -41,6 +45,7 @@ export function TeacherClassesList({
   function onPeriodChange(periodId: string) {
     const params = new URLSearchParams();
     params.set("periodId", periodId);
+    if (selectedStudentId) params.set("studentId", selectedStudentId);
     router.push(`${pathname}?${params.toString()}`);
   }
 
@@ -48,6 +53,13 @@ export function TeacherClassesList({
     return (
       <p className="text-muted-foreground">No hay períodos. Pide al administrador que cree uno.</p>
     );
+  }
+
+  function onStudentChange(studentId: string) {
+    const params = new URLSearchParams();
+    if (selectedPeriodId) params.set("periodId", selectedPeriodId);
+    params.set("studentId", studentId);
+    router.push(`${pathname}?${params.toString()}`);
   }
 
   return (
@@ -68,6 +80,23 @@ export function TeacherClassesList({
             ))}
           </SelectContent>
         </Select>
+        <div className="flex flex-wrap items-center gap-2 ml-10">
+          <label htmlFor="teacher-student-select" className="text-sm font-medium">
+            Alumno
+          </label>
+          <Select value={selectedStudentId ?? ""} onValueChange={onStudentChange}>
+            <SelectTrigger id="teacher-student-select" className="w-[200px]">
+              <SelectValue placeholder="Seleccionar alumno" />
+            </SelectTrigger>
+            <SelectContent>
+              {students.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
       {classes.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
