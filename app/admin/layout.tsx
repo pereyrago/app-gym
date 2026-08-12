@@ -11,17 +11,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (profile.role !== "admin") redirect("/teacher");
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen min-h-[100dvh] flex-col md:flex-row overflow-hidden bg-background">
       <a href="#main-content" className="skip-link">
         Saltar al contenido
       </a>
       <AdminNav />
       <main
         id="main-content"
-        className="flex-1 overflow-auto p-3 md:p-4 scrollbar-thin"
+        className="flex-1 overflow-y-auto scrollbar-thin bg-background focus:outline-none"
         tabIndex={-1}
       >
-        <div className="mx-auto w-full max-w-5xl">{children}</div>
+        <div className="mx-auto w-full max-w-5xl p-4 md:p-6 lg:p-8">{children}</div>
       </main>
     </div>
   );
