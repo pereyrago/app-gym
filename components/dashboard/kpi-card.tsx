@@ -9,8 +9,8 @@ type KpiCardProps = {
   trend?: "up" | "down" | "neutral";
   trendLabel?: string;
   icon?: LucideIcon;
+  iconCircle?: string;
   className?: string;
-  /** Opcional: nodo para sparkline o mini chart */
   children?: React.ReactNode;
 };
 
@@ -21,6 +21,7 @@ export function KpiCard({
   trend,
   trendLabel,
   icon: Icon,
+  iconCircle,
   className,
   children,
 }: KpiCardProps) {
@@ -28,10 +29,23 @@ export function KpiCard({
     <Card className={cn("border border-border/80 shadow-none", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
         <span className="text-[13px] font-medium text-muted-foreground">{title}</span>
-        {Icon && <Icon className="h-4 w-4 shrink-0 text-secondary" aria-hidden />}
+        {Icon && !iconCircle && <Icon className="h-4 w-4 shrink-0 text-secondary" aria-hidden />}
       </CardHeader>
       <CardContent className="p-3 pt-0">
-        <p className="text-2xl font-semibold tabular-nums">{value}</p>
+        <div className="flex gap-3">
+          {Icon && iconCircle && (
+            <div
+              className={cn(
+                "mb-2 flex h-10 w-10 items-center justify-center rounded-full",
+                iconCircle
+              )}
+              aria-hidden
+            >
+              <Icon className="h-5 w-5" />
+            </div>
+          )}
+          <p className="text-2xl font-semibold tabular-nums">{value}</p>
+        </div>
         {(subtitle ?? trendLabel) && (
           <div className="mt-1 flex items-center gap-2 text-[12px] text-muted-foreground">
             {trend === "up" && (
@@ -48,6 +62,7 @@ export function KpiCard({
             {subtitle && <span>{subtitle}</span>}
           </div>
         )}
+
         {children}
       </CardContent>
     </Card>
