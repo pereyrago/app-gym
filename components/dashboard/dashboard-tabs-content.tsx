@@ -251,7 +251,7 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
   return (
     <div className="w-full space-y-10">
       {/* ===================== KPIs ===================== */}
-      <section className="space-y-3">
+      {/* <section className="space-y-3">
         <h2 className="text-lg font-semibold">KPIs principales</h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
           <KpiCard title="Total alumnos" value={kpis?.total_students ?? 0} icon={Users} />
@@ -291,7 +291,7 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
             subtitle="Activos / total alumnos"
           />
         </div>
-      </section>
+      </section> */}
 
       {/* ============ Cancelaciones y comportamiento ============ */}
       <section className="space-y-6">
