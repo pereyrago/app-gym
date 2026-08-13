@@ -1,55 +1,58 @@
 "use client";
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import type { CancellationReasonRow } from "@/features/dashboard/types";
-import { useChartColors } from "@/hooks/use-chart-colors";
 
-const REASONS_FILL = "hsl(25, 95%, 53%)";
+// Colores de barra por posición, igual al mockup (rojo → naranja → amarillo → azul → verde)
+const BAR_COLORS = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];
 
 type CancellationReasonsChartProps = {
   data: CancellationReasonRow[];
   emptyMessage?: string;
+  /** Cuántos motivos mostrar. Default: 5 */
+  topN?: number;
 };
 
-/** BarChart vertical: motivos de cancelación (mejor legibilidad que Pie cuando hay varias categorías). */
 export function CancellationReasonsChart({
   data,
   emptyMessage = "Sin datos",
+  topN = 5,
 }: CancellationReasonsChartProps) {
-  const colors = useChartColors();
   if (!data.length) {
     return (
-      <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-[160px] items-center justify-center text-sm text-muted-foreground">
         {emptyMessage}
       </div>
     );
   }
 
+  const sorted = [...data].sort((a, b) => b.count - a.count).slice(0, topN);
+  const max = sorted[0]?.count ?? 1;
+
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke={colors.border} vertical={false} />
-        <XAxis dataKey="reason_label" tick={{ fontSize: 11 }} tickLine={false} />
-        <YAxis
-          allowDecimals={false}
-          tick={{ fontSize: 11 }}
-          tickLine={false}
-          axisLine={false}
-          width={28}
-        />
-        <Tooltip
-          contentStyle={{
-            fontSize: 12,
-            backgroundColor: "hsl(var(--card))",
-            color: "hsl(var(--foreground))",
-            border: "1px solid hsl(var(--border))",
-          }}
-          cursor={{ fill: colors.chartHover }}
-          formatter={(value: number) => [value, "Cantidad"]}
-          labelFormatter={(label) => label}
-        />
-        <Bar dataKey="count" name="Cantidad" fill={REASONS_FILL} radius={[4, 4, 0, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <ul className="space-y-3" aria-label="Motivos de cancelación">
+      {sorted.map((row, i) => {
+        const widthPct = max > 0 ? Math.round((row.count / max) * 100) : 0;
+        const barColor = BAR_COLORS[i % BAR_COLORS.length] ?? "bg-muted-foreground";
+
+        return (
+          <li key={row.reason_key} className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[13px] font-medium leading-none">{row.reason_label}</span>
+              <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground">
+                {row.count}
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/50">
+              <div
+                className={`h-full rounded-full ${barColor} transition-all`}
+                style={{ width: `${widthPct}%` }}
+                role="presentation"
+                aria-label={`${widthPct}%`}
+              />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
