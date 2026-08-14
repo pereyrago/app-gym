@@ -297,10 +297,10 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
       <section className="space-y-6">
         <h2 className="text-lg font-semibold">Cancelaciones y comportamiento</h2>
 
-        <div className="space-y-3">
+        {/* <div className="space-y-3">
           <h3 className="text-sm font-medium text-muted-foreground">KPIs</h3>
           <CancellationKpisCards data={props.cancellationKpis} />
-        </div>
+        </div> */}
 
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-muted-foreground">Tendencia en el tiempo</h3>
@@ -325,7 +325,6 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
             </SectionCard>
           </div>
         </div>
-
         <div className="space-y-4">
           <h3 className="text-sm font-medium text-muted-foreground">Rankings</h3>
           <div className="grid gap-4 lg:grid-cols-2">

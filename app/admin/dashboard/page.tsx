@@ -66,9 +66,14 @@ export default async function AdminDashboardPage({
   }));
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
+    <div className="mx-auto w-full max-w-6xl space-y-5 sm:space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="shrink-0" asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 h-9 w-9 rounded-lg hover:bg-muted/80"
+          asChild
+        >
           <Link href="/admin" aria-label="Volver al inicio">
             <ArrowLeft className="h-4 w-4" />
           </Link>
