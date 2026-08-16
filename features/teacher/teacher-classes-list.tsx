@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { formatClassDate } from "@/lib/app-timezone";
 import type { Period, Student } from "@/types";
 import type { ClassWithType } from "@/types";
@@ -132,25 +133,40 @@ export function TeacherClassesList({
             {classes.map((c) => {
               const cancelledByStudent = c.status === "cancel_by_student";
               const cancelledByTeacher = c.status === "cancel_by_teacher";
-              const cancelledButtonClass = cancelledByStudent
-                ? "w-full border-amber-500 bg-amber-500 text-white hover:bg-amber-600 hover:border-amber-600 dark:bg-amber-500 dark:text-white dark:hover:bg-amber-600"
-                : cancelledByTeacher
-                  ? "w-full border-[rgb(225,43,43)] bg-[rgb(225,43,43)] text-white hover:bg-[rgb(200,35,35)] hover:border-[rgb(200,35,35)] dark:bg-[rgb(225,43,43)] dark:text-white dark:hover:bg-[rgb(200,35,35)]"
-                  : "w-full transition-colors duration-200 ease-in-out";
+              const isCancelled = cancelledByStudent || cancelledByTeacher;
+
               return (
                 <TableRow key={c.id}>
                   <TableCell>{formatClassDate(c.class_date)}</TableCell>
-                  <TableCell className="font-medium capitalize">
-                    {c.class_types?.name ?? "—"}
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span className="capitalize">{c.class_types?.name ?? "—"}</span>
+                      {cancelledByStudent && (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700 dark:text-amber-400 font-normal px-1.5 py-0"
+                        >
+                          Canc. alumno
+                        </Badge>
+                      )}
+                      {cancelledByTeacher && (
+                        <Badge
+                          variant="outline"
+                          className="border-red-500/40 bg-red-500/10 text-[10px] text-red-700 dark:text-red-400 font-normal px-1.5 py-0"
+                        >
+                          Canc. profesor
+                        </Badge>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-[12px]">
                     {c.start_time?.slice(0, 5) ?? "—"} · {c.duration_minutes ?? "—"} min
                   </TableCell>
                   <TableCell>
                     <Button
-                      variant={cancelledByStudent || cancelledByTeacher ? "outline" : "secondary"}
+                      variant={isCancelled ? "outline" : "secondary"}
                       size="sm"
-                      className={cancelledButtonClass}
+                      className="w-full transition-colors"
                       asChild
                     >
                       <Link href={`/teacher/classes/${c.id}`}>Editar</Link>

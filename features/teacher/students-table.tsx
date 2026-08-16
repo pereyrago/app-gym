@@ -27,6 +27,7 @@ import {
 import { EditStudentDialog } from "./edit-student-dialog";
 import { deleteStudentAction } from "@/app/teacher/students/actions";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 const DEBOUNCE_MS = 400;
 
@@ -59,9 +60,11 @@ export function StudentsTable({
   const pathname = usePathname();
   const { toast } = useToast();
   const [searchInput, setSearchInput] = useState(searchFromUrl);
-  
-  // Estado para controlar el diálogo de edición
+
+  // Estado para controlar el diálogo de edición y eliminación
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [deletingStudent, setDeletingStudent] = useState<Student | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     setSearchInput(searchFromUrl);
@@ -87,20 +90,21 @@ export function StudentsTable({
     [sortBy, sortOrder, searchInput, pathname, router]
   );
 
-  async function handleDelete(student: Student) {
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar a ${student.full_name}?`)) {
-      return;
-    }
-
+  async function handleConfirmDelete() {
+    if (!deletingStudent || isDeleting) return;
+    setIsDeleting(true);
     try {
-      await deleteStudentAction(student.id);
+      await deleteStudentAction(deletingStudent.id);
       toast({ title: "Alumno eliminado correctamente" });
+      setDeletingStudent(null);
     } catch (e) {
       toast({
         title: "Error",
         description: e instanceof Error ? e.message : "No se pudo eliminar el alumno",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -230,9 +234,9 @@ export function StudentsTable({
                             <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
-                            onClick={() => handleDelete(s)}
+                            onClick={() => setDeletingStudent(s)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Eliminar
@@ -260,6 +264,17 @@ export function StudentsTable({
           onOpenChange={(open) => !open && setEditingStudent(null)}
         />
       )}
+
+      <ConfirmDialog
+        open={deletingStudent != null}
+        onOpenChange={(open) => !open && setDeletingStudent(null)}
+        title="Eliminar alumno"
+        description={`¿Estás seguro de que quieres eliminar a ${deletingStudent?.full_name}? Se quitará de tu lista de alumnos.`}
+        confirmLabel="Eliminar"
+        destructive
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+      />
     </>
   );
 }

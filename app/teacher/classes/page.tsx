@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { getMyTeacherId } from "@/lib/teacher";
+import { getMyTeacherId, getMyTeacherSlug } from "@/lib/teacher";
 import { getPeriods, getCurrentPeriod } from "@/repositories/periods";
 import {
   getClassesByTeacherAndPeriod,
@@ -9,7 +8,7 @@ import { getClassTypes } from "@/repositories/class-types";
 import { getStudentsByTeacher } from "@/repositories/students";
 import { TeacherClassesList } from "@/features/teacher/teacher-classes-list";
 import { CreateClassDialog } from "@/features/teacher/create-class-dialog";
-import { ChevronLeft } from "lucide-react";
+import { TeacherQRCard } from "@/features/teacher/teacher-qr-card";
 
 export default async function TeacherClassesPage({
   searchParams,
@@ -27,10 +26,11 @@ export default async function TeacherClassesPage({
     );
   }
 
-  const [periods, currentPeriod, classTypesResult, students] = await Promise.all([
+  const [periods, currentPeriod, classTypesResult, publicSlug, students] = await Promise.all([
     getPeriods(),
     getCurrentPeriod(),
     getClassTypes().catch(() => [] as Awaited<ReturnType<typeof getClassTypes>>),
+    getMyTeacherSlug(),
     getStudentsByTeacher(teacherId).catch(
       () => [] as Awaited<ReturnType<typeof getStudentsByTeacher>>
     ),
@@ -53,33 +53,28 @@ export default async function TeacherClassesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <nav aria-label="Breadcrumb">
-          <Link
-            href="/teacher"
-            className="inline-flex items-center text-[13px] text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="mr-1 h-3.5 w-3.5" />
-            Profesor
-          </Link>
-        </nav>
+      {/* Header con título, compartir link y botón de crear clase */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold tracking-tight">Clases</h1>
+        <div className="flex items-center gap-3">
+          {publicSlug && <TeacherQRCard slug={publicSlug} />}
+          <CreateClassDialog
+            teacherId={teacherId}
+            currentPeriod={currentPeriod}
+            classTypes={classTypes}
+          />
+        </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <TeacherClassesList
-          teacherId={teacherId}
-          periods={periods}
-          selectedPeriodId={selectedPeriodId}
-          students={students}
-          selectedStudentId={selectedStudentId}
-          classes={classes}
-        />
-        <CreateClassDialog
-          teacherId={teacherId}
-          currentPeriod={currentPeriod}
-          classTypes={classTypes}
-        />
-      </div>
+
+      {/* Listado y filtros de clases */}
+      <TeacherClassesList
+        teacherId={teacherId}
+        periods={periods}
+        selectedPeriodId={selectedPeriodId}
+        students={students}
+        selectedStudentId={selectedStudentId}
+        classes={classes}
+      />
     </div>
   );
 }

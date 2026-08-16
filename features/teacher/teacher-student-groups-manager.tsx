@@ -22,6 +22,7 @@ import {
   updateTeacherStudentGroupAction,
 } from "@/app/teacher/student-groups/actions";
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 function normalizeName(s: string): string {
   return s
@@ -47,7 +48,8 @@ export function TeacherStudentGroupsManager({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<TeacherStudentGroupWithStudents | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredStudents = useMemo(() => {
     if (!search.trim()) return students;
@@ -115,12 +117,13 @@ export function TeacherStudentGroupsManager({
     }
   }
 
-  async function handleDelete(groupId: string) {
-    if (!confirm("¿Eliminar este grupo? Los alumnos no se borran.")) return;
-    setDeletingId(groupId);
+  async function handleConfirmDelete() {
+    if (!deletingGroup || isDeleting) return;
+    setIsDeleting(true);
     try {
-      await deleteTeacherStudentGroupAction(groupId);
+      await deleteTeacherStudentGroupAction(deletingGroup.id);
       toast({ title: "Grupo eliminado" });
+      setDeletingGroup(null);
       router.refresh();
     } catch (e) {
       toast({
@@ -129,7 +132,7 @@ export function TeacherStudentGroupsManager({
         variant: "destructive",
       });
     } finally {
-      setDeletingId(null);
+      setIsDeleting(false);
     }
   }
 
@@ -186,14 +189,9 @@ export function TeacherStudentGroupsManager({
                   variant="ghost"
                   size="sm"
                   className="h-8 gap-1 text-[12px] text-destructive hover:text-destructive"
-                  disabled={deletingId === g.id}
-                  onClick={() => void handleDelete(g.id)}
+                  onClick={() => setDeletingGroup(g)}
                 >
-                  {deletingId === g.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5" />
-                  )}
+                  <Trash2 className="h-3.5 w-3.5" />
                   Eliminar
                 </Button>
               </div>
@@ -265,15 +263,23 @@ export function TeacherStudentGroupsManager({
                 ))
               )}
             </div>
-            <p className="text-[12px] text-muted-foreground">
-              Seleccionados: {selectedIds.size}
-            </p>
+            <p className="text-[12px] text-muted-foreground">Seleccionados: {selectedIds.size}</p>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setEditorOpen(false)} disabled={saving}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditorOpen(false)}
+              disabled={saving}
+            >
               Cancelar
             </Button>
-            <Button type="button" variant="secondary" onClick={() => void handleSave()} disabled={saving}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void handleSave()}
+              disabled={saving}
+            >
               {saving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -288,6 +294,17 @@ export function TeacherStudentGroupsManager({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deletingGroup != null}
+        onOpenChange={(open) => !open && setDeletingGroup(null)}
+        title="Eliminar grupo"
+        description={`¿Estás seguro de que querés eliminar el grupo "${deletingGroup?.name}"? Los alumnos no se borrarán del sistema.`}
+        confirmLabel="Eliminar"
+        destructive
+        loading={isDeleting}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 }

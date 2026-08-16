@@ -108,7 +108,7 @@ export function TeacherClassesView({
                       className="w-full transition-colors duration-200 ease-in-out"
                       asChild
                     >
-                      <Link href={`/admin/teachers/${teacherId}/classes/${c.id}`}>Editar</Link>
+                      <Link href={`/admin/teachers/${teacherId}/classes/${c.id}`}>Ver detalle</Link>
                     </Button>
                   </TableCell>
                 </TableRow>

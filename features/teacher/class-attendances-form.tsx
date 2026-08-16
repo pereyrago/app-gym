@@ -33,6 +33,7 @@ import { Info, Loader2, Search } from "lucide-react";
 import type { Student } from "@/types";
 import type { CancellationReasonType } from "@/types/database.types";
 import type { AbsenceDetail } from "@/repositories/attendances";
+import { cn } from "@/lib/utils";
 
 const REASON_OPTIONS: { value: CancellationReasonType; label: string }[] = [
   { value: "viaje", label: "Viaje" },
@@ -258,6 +259,25 @@ export function ClassAttendancesForm({
     }
   }
 
+  async function handleSaveWithoutAbsences() {
+    setSaving(true);
+    try {
+      await setAttendancesAction(classId, Array.from(attendedIds));
+      toast({ title: "Asistencias guardadas" });
+      setAbsenceDialogOpen(false);
+      router.push("/teacher");
+      router.refresh();
+    } catch (e) {
+      toast({
+        title: "Error",
+        description: e instanceof Error ? e.message : "No se pudieron guardar",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (students.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -293,10 +313,30 @@ export function ClassAttendancesForm({
             {sortedStudents.map((s) => {
               const pending = s.status === "to_confirm";
               const isAbsent = absentIdsSet.has(s.id) && !attendedIds.has(s.id);
+              const isAttended = attendedIds.has(s.id);
+
               return (
-                <TableRow key={s.id}>
-                  <TableCell className="font-medium capitalize">{s.full_name}</TableCell>
-                  <TableCell>
+                <TableRow
+                  key={s.id}
+                  onClick={() => !pending && canEdit && toggleAttendance(s.id)}
+                  className={cn(
+                    canEdit &&
+                      !pending &&
+                      "cursor-pointer hover:bg-muted/50 select-none transition-colors",
+                    isAttended && "bg-muted/20"
+                  )}
+                >
+                  <TableCell className="font-medium">
+                    <div className="flex flex-col">
+                      <span className="capitalize">{s.full_name}</span>
+                      {s.phone && (
+                        <span className="text-[11px] text-muted-foreground sm:hidden">
+                          {s.phone}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     {isAbsent ? (
                       <button
                         type="button"
@@ -350,12 +390,15 @@ export function ClassAttendancesForm({
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Checkbox
-                      checked={attendedIds.has(s.id)}
-                      onCheckedChange={() => toggleAttendance(s.id)}
-                      disabled={!canEdit}
-                      aria-label={`${s.full_name} asistió`}
-                    />
+                    <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isAttended}
+                        onCheckedChange={() => toggleAttendance(s.id)}
+                        disabled={!canEdit}
+                        aria-label={`${s.full_name} asistió`}
+                        className="h-5 w-5 rounded"
+                      />
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -493,32 +536,48 @@ export function ClassAttendancesForm({
               })}
             </Tabs>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAbsenceDialogOpen(false)} disabled={saving}>
-              Volver
-            </Button>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
-              onClick={handleSubmitAbsenceReasons}
-              disabled={
-                saving ||
-                !removedForAbsenceDialog.every((id) => {
-                  const r = absentReasons[id];
-                  return (
-                    r?.reason_type &&
-                    (r.reason_type !== "otro" || String(r.reason_other ?? "").trim())
-                  );
-                })
-              }
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-foreground justify-start sm:justify-center"
+              onClick={handleSaveWithoutAbsences}
+              disabled={saving}
             >
-              {saving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Guardando…
-                </>
-              ) : (
-                "Guardar faltas y asistencias"
-              )}
+              Solo desmarcar (sin registrar faltas)
             </Button>
+            <div className="flex items-center gap-2 justify-end sm:ml-auto">
+              <Button
+                variant="outline"
+                onClick={() => setAbsenceDialogOpen(false)}
+                disabled={saving}
+              >
+                Volver
+              </Button>
+              <Button
+                onClick={handleSubmitAbsenceReasons}
+                disabled={
+                  saving ||
+                  !removedForAbsenceDialog.every((id) => {
+                    const r = absentReasons[id];
+                    return (
+                      r?.reason_type &&
+                      (r.reason_type !== "otro" || String(r.reason_other ?? "").trim())
+                    );
+                  })
+                }
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Guardando…
+                  </>
+                ) : (
+                  "Guardar faltas y asistencias"
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
