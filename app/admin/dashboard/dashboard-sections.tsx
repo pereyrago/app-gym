@@ -32,7 +32,11 @@ import {
   getTeacherRankingMetrics,
   getStudentRankingMetrics,
 } from "@/repositories/dashboard-executive-queries";
-import type { DashboardFilters } from "@/features/dashboard/types";
+import type {
+  DashboardFilters,
+  ExecutiveSummaryKpis,
+  TeacherRankingRow,
+} from "@/features/dashboard/types";
 import { ExecutiveSummaryKpisSection } from "@/components/dashboard/executive-summary-kpis";
 import { BusinessPerformanceSection } from "@/components/dashboard/business-performance-section";
 import { DashboardTabsContent } from "@/components/dashboard/dashboard-tabs-content";
@@ -72,13 +76,25 @@ export async function DashboardPreviewSection({ filters }: { filters: DashboardF
         studentsByTeacher={studentsByTeacher}
       />
       <Suspense fallback={detailsFallback}>
-        <DashboardDetailsSection filters={filters} />
+        <DashboardDetailsSection
+          filters={filters}
+          executiveSummaryKpis={executiveSummaryKpis}
+          teacherRanking={teacherRanking}
+        />
       </Suspense>
     </>
   );
 }
 
-async function DashboardDetailsSection({ filters }: { filters: DashboardFilters }) {
+async function DashboardDetailsSection({
+  filters,
+  executiveSummaryKpis,
+  teacherRanking,
+}: {
+  filters: DashboardFilters;
+  executiveSummaryKpis: ExecutiveSummaryKpis | null;
+  teacherRanking: TeacherRankingRow[];
+}) {
   const supabase = await createClient();
   const [
     kpis,
@@ -164,6 +180,8 @@ async function DashboardDetailsSection({ filters }: { filters: DashboardFilters 
       topWeekday={topWeekday}
       topClassType={topClassType}
       topTeacherByAvg={topTeacherByAvg}
+      executiveSummaryKpis={executiveSummaryKpis}
+      teacherRanking={teacherRanking}
       studentRankingSlot={
         <Suspense fallback={rankingFallback}>
           <StudentRankingSection filters={filters} />

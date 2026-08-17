@@ -184,6 +184,8 @@ import type {
   CancellationsByMonthRow,
   CancellationsByTeacherOverTimeRow,
   IndividualVsSharedTotalsRow,
+  ExecutiveSummaryKpis,
+  TeacherRankingRow,
 } from "@/features/dashboard/types";
 import {
   dayCountTable,
@@ -236,6 +238,10 @@ export type DashboardTabsContentProps = {
   topWeekday: string | null;
   topClassType: string | null;
   topTeacherByAvg: string | null;
+  /** Opcional: para insights narrativos. Ya fetcheado en DashboardPreviewSection. */
+  executiveSummaryKpis?: ExecutiveSummaryKpis | null;
+  /** Opcional: para insights de profesor. Ya fetcheado en DashboardPreviewSection. */
+  teacherRanking?: TeacherRankingRow[] | null;
 };
 
 export function DashboardTabsContent(props: DashboardTabsContentProps) {
@@ -584,6 +590,8 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           topWeekday={topWeekday}
           topClassType={topClassType}
           topTeacherByAvg={topTeacherByAvg}
+          executiveSummaryKpis={props.executiveSummaryKpis}
+          teacherRanking={props.teacherRanking}
         />
       </section>
     </div>

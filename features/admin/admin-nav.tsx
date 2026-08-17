@@ -23,12 +23,12 @@ const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/teachers", label: "Profesores", icon: GraduationCap },
   { href: "/admin/students", label: "Alumnos", icon: Users },
-  { href: "/admin/periods", label: "Calendario", icon: CalendarDays },
+  { href: "/admin/periods", label: "Períodos", icon: CalendarDays },
   { href: "/admin/reports", label: "Reportes", icon: FileText },
 ] as const;
 
 const BOTTOM_ITEMS = [
-  { href: "/admin/class-types", label: "Configuración", icon: Settings },
+  { href: "/admin/class-types", label: "Tipos de clase", icon: Settings },
 ] as const;
 
 type NavItemProps = {

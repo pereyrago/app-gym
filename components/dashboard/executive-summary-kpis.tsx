@@ -2,7 +2,7 @@
 
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import type { ExecutiveKpiMetric, ExecutiveSummaryKpis } from "@/features/dashboard/types";
-import { Users, UserPlus, Calendar, Clock, XCircle, CheckCircle2, Star } from "lucide-react";
+import { Users, UserPlus, Calendar, Clock, XCircle, CheckCircle2 } from "lucide-react";
 
 type ExecutiveSummaryKpisProps = {
   data: ExecutiveSummaryKpis | null;
@@ -40,7 +40,7 @@ export function ExecutiveSummaryKpisSection({
 
   return (
     <section aria-label="KPIs del período">
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <KpiCard
           title="Alumnos activos"
           value={data.activeStudents.current}
@@ -48,7 +48,6 @@ export function ExecutiveSummaryKpisSection({
           trendLabel={trendLabel(data.activeStudents)}
           icon={Users}
           iconCircle="bg-violet-500/20 text-violet-400"
-          className="min-w-[160px] flex-1"
         />
         <KpiCard
           title="Nuevos alumnos"
@@ -57,7 +56,6 @@ export function ExecutiveSummaryKpisSection({
           trendLabel={trendLabel(data.newStudents)}
           icon={UserPlus}
           iconCircle="bg-emerald-500/20 text-emerald-400"
-          className="min-w-[160px] flex-1"
         />
         <KpiCard
           title="Clases realizadas"
@@ -66,7 +64,6 @@ export function ExecutiveSummaryKpisSection({
           trendLabel={trendLabel(data.classes)}
           icon={Calendar}
           iconCircle="bg-blue-500/20 text-blue-400"
-          className="min-w-[160px] flex-1"
         />
         <KpiCard
           title="Horas trabajadas"
@@ -75,7 +72,6 @@ export function ExecutiveSummaryKpisSection({
           trendLabel={trendLabel(data.hours)}
           icon={Clock}
           iconCircle="bg-amber-500/20 text-amber-400"
-          className="min-w-[160px] flex-1"
         />
         <KpiCard
           title="Cancelaciones"
@@ -85,7 +81,6 @@ export function ExecutiveSummaryKpisSection({
           trendLabel={trendLabel(data.cancellations)}
           icon={XCircle}
           iconCircle="bg-red-500/20 text-red-400"
-          className="min-w-[160px] flex-1"
         />
         <KpiCard
           title="Asistencia"
@@ -94,16 +89,6 @@ export function ExecutiveSummaryKpisSection({
           trendLabel={trendLabel(data.attendanceRatePct)}
           icon={CheckCircle2}
           iconCircle="bg-sky-500/20 text-sky-400"
-          className="min-w-[160px] flex-1"
-        />
-        {/* Satisfacción — placeholder sin dato real */}
-        <KpiCard
-          title="Satisfacción"
-          value="—"
-          subtitle="Próximamente"
-          icon={Star}
-          iconCircle="bg-yellow-500/20 text-yellow-400"
-          className="min-w-[160px] flex-1 opacity-60"
         />
       </div>
     </section>

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import type { DashboardFilters } from "@/features/dashboard/types";
 
 type Teacher = { id: string; full_name: string | null };
@@ -169,15 +170,19 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-card/50 p-2 sm:p-2.5">
       {/* Selector de período */}
       <Select value={activePreset} onValueChange={(v) => handlePresetChange(v as DatePresetId)}>
-        <SelectTrigger id="date_preset" className="h-9 w-auto min-w-[130px]" aria-label="Período">
+        <SelectTrigger
+          id="date_preset"
+          className="h-8 w-auto min-w-[130px] text-[13px]"
+          aria-label="Período"
+        >
           <SelectValue placeholder="Período" />
         </SelectTrigger>
         <SelectContent>
           {DATE_PRESETS.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
+            <SelectItem key={p.id} value={p.id} className="text-[13px]">
               {p.label}
             </SelectItem>
           ))}
@@ -186,11 +191,11 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
 
       {/* Inputs de fecha — solo en modo personalizado */}
       {activePreset === "custom" && (
-        <>
+        <div className="flex items-center gap-1.5">
           <Input
             id="date_from"
             type="date"
-            className="h-9 w-[140px]"
+            className="h-8 w-[135px] text-[13px]"
             value={dateFromDraft}
             aria-label="Desde"
             onChange={(e) => {
@@ -199,13 +204,13 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
               scheduleDateParams(value, dateToDraft);
             }}
           />
-          <span className="text-[13px] text-muted-foreground" aria-hidden>
+          <span className="text-[12px] text-muted-foreground" aria-hidden>
             –
           </span>
           <Input
             id="date_to"
             type="date"
-            className="h-9 w-[140px]"
+            className="h-8 w-[135px] text-[13px]"
             value={dateToDraft}
             aria-label="Hasta"
             onChange={(e) => {
@@ -214,7 +219,7 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
               scheduleDateParams(dateFromDraft, value);
             }}
           />
-        </>
+        </div>
       )}
 
       {/* Profesor */}
@@ -222,13 +227,19 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
         value={filters.teacherId ?? "all"}
         onValueChange={(v) => setParams({ teacher_id: v === "all" ? null : v })}
       >
-        <SelectTrigger id="teacher" className="h-9 w-auto min-w-[150px]" aria-label="Profesor">
+        <SelectTrigger
+          id="teacher"
+          className="h-8 w-auto min-w-[150px] text-[13px]"
+          aria-label="Profesor"
+        >
           <SelectValue placeholder="Todos los profesores" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos los profesores</SelectItem>
+          <SelectItem value="all" className="text-[13px]">
+            Todos los profesores
+          </SelectItem>
           {teachers.map((t) => (
-            <SelectItem key={t.id} value={t.id}>
+            <SelectItem key={t.id} value={t.id} className="text-[13px]">
               {t.full_name || "Sin nombre"}
             </SelectItem>
           ))}
@@ -240,13 +251,19 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
         value={filters.studentId ?? "all"}
         onValueChange={(v) => setParams({ student_id: v === "all" ? null : v })}
       >
-        <SelectTrigger id="student" className="h-9 w-auto min-w-[140px]" aria-label="Alumno">
+        <SelectTrigger
+          id="student"
+          className="h-8 w-auto min-w-[140px] text-[13px]"
+          aria-label="Alumno"
+        >
           <SelectValue placeholder="Todos los alumnos" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos los alumnos</SelectItem>
+          <SelectItem value="all" className="text-[13px]">
+            Todos los alumnos
+          </SelectItem>
           {students.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
+            <SelectItem key={s.id} value={s.id} className="text-[13px]">
               {s.full_name || "Sin nombre"}
             </SelectItem>
           ))}
@@ -260,15 +277,17 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
       >
         <SelectTrigger
           id="class_mode"
-          className="h-9 w-auto min-w-[130px]"
+          className="h-8 w-auto min-w-[130px] text-[13px]"
           aria-label="Tipo de clase"
         >
           <SelectValue placeholder="Todos los tipos" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos los tipos</SelectItem>
+          <SelectItem value="all" className="text-[13px]">
+            Todos los tipos
+          </SelectItem>
           {CLASS_MODES.map((c) => (
-            <SelectItem key={c.id} value={c.id}>
+            <SelectItem key={c.id} value={c.id} className="text-[13px]">
               {c.label}
             </SelectItem>
           ))}
@@ -277,15 +296,17 @@ export function DashboardFiltersClient({ filters, teachers, students }: Dashboar
 
       {/* Limpiar filtros — solo visible cuando hay al menos un filtro activo */}
       {hasActiveFilters && (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={handleClear}
-          className="flex h-9 items-center gap-1.5 rounded-md border border-border/60 px-3 text-[13px] text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+          className="h-8 gap-1.5 px-2.5 text-[13px] text-muted-foreground hover:text-foreground"
           aria-label="Limpiar filtros"
         >
           <RotateCcw className="h-3.5 w-3.5" aria-hidden />
           Limpiar filtros
-        </button>
+        </Button>
       )}
     </div>
   );

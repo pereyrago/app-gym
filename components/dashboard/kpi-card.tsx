@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { LucideIcon } from "lucide-react";
+import { TrendingDown, TrendingUp, type LucideIcon } from "lucide-react";
 
 type KpiCardProps = {
   title: string;
@@ -26,40 +26,45 @@ export function KpiCard({
   children,
 }: KpiCardProps) {
   return (
-    <Card className={cn("border border-border/80 shadow-none", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-2">
-        <span className="text-[13px] font-medium text-muted-foreground">{title}</span>
-        {Icon && !iconCircle && <Icon className="h-4 w-4 shrink-0 text-secondary" aria-hidden />}
+    <Card className={cn("border border-border/80 shadow-none transition-colors", className)}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3.5 pb-1.5">
+        <span className="text-[12px] font-medium uppercase tracking-wider text-muted-foreground truncate">
+          {title}
+        </span>
+        {Icon && (
+          <div
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md shrink-0",
+              iconCircle || "text-muted-foreground/70 bg-muted/50"
+            )}
+            aria-hidden
+          >
+            <Icon className="h-3.5 w-3.5" />
+          </div>
+        )}
       </CardHeader>
-      <CardContent className="p-3 pt-0">
-        <div className="flex gap-3">
-          {Icon && iconCircle && (
-            <div
-              className={cn(
-                "mb-2 flex h-10 w-10 items-center justify-center rounded-full",
-                iconCircle
-              )}
-              aria-hidden
-            >
-              <Icon className="h-5 w-5" />
-            </div>
-          )}
-          <p className="text-2xl font-semibold tabular-nums">{value}</p>
-        </div>
+      <CardContent className="p-3.5 pt-0">
+        <p className="text-2xl font-bold tracking-tight tabular-nums text-foreground">{value}</p>
         {(subtitle ?? trendLabel) && (
-          <div className="mt-1 flex items-center gap-2 text-[12px] text-muted-foreground">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
             {trend === "up" && (
-              <span className="text-green-600" aria-hidden>
-                ↑
+              <span className="inline-flex items-center gap-0.5 font-medium text-emerald-600 dark:text-emerald-400">
+                <TrendingUp className="h-3 w-3" aria-hidden />
+                {trendLabel}
               </span>
             )}
             {trend === "down" && (
-              <span className="text-red-600" aria-hidden>
-                ↓
+              <span className="inline-flex items-center gap-0.5 font-medium text-rose-600 dark:text-rose-400">
+                <TrendingDown className="h-3 w-3" aria-hidden />
+                {trendLabel}
               </span>
             )}
-            {trendLabel && <span>{trendLabel}</span>}
-            {subtitle && <span>{subtitle}</span>}
+            {trend === "neutral" && trendLabel && <span>{trendLabel}</span>}
+            {subtitle && (
+              <span className={cn(trendLabel && "before:content-['·'] before:mr-1")}>
+                {subtitle}
+              </span>
+            )}
           </div>
         )}
 
