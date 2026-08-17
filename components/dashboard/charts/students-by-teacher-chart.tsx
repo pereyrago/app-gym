@@ -32,21 +32,21 @@ export function StudentsByTeacherChart({
     );
   }
 
-  const sorted = [...data].sort((a, b) => b.student_count - a.student_count);
+  const sorted = [...data].sort((a, b) => b.student_count - a.student_count).slice(0, 5);
 
   return (
-    <ResponsiveContainer width="100%" height={Math.max(160, sorted.length * 36)}>
-      <BarChart data={sorted} margin={{ top: 2, right: 32, left: 0, bottom: 2 }} layout="vertical">
+    <ResponsiveContainer width="100%" height={180}>
+      <BarChart data={sorted} margin={{ top: 2, right: 28, left: 0, bottom: 2 }} layout="vertical">
         <CartesianGrid strokeDasharray="3 3" stroke={colors.border} horizontal={false} />
-        <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={28} />
+        <XAxis type="number" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
         <YAxis
           type="category"
           dataKey="teacher_name"
-          tick={{ fontSize: 12 }}
+          tick={{ fontSize: 11 }}
           tickLine={false}
           axisLine={false}
-          width={110}
-          tickFormatter={(v: string) => (v.length > 14 ? `${v.slice(0, 13)}…` : v)}
+          width={88}
+          tickFormatter={(v: string) => (v.length > 12 ? `${v.slice(0, 11)}…` : v)}
         />
         <Tooltip
           contentStyle={{
@@ -62,7 +62,7 @@ export function StudentsByTeacherChart({
           <LabelList
             dataKey="student_count"
             position="right"
-            style={{ fontSize: 12, fontWeight: 600, fill: "hsl(var(--foreground))" }}
+            style={{ fontSize: 11, fontWeight: 600, fill: "hsl(var(--foreground))" }}
           />
         </Bar>
       </BarChart>

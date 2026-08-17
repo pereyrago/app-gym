@@ -3,11 +3,33 @@
 import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { Skeleton } from "@/components/ui/skeleton";
-import { KpiCard } from "@/components/dashboard/kpi-card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionCard } from "@/components/dashboard/section-card";
 import { BusinessInsights } from "@/components/dashboard/business-insights";
+
 const chartFallback = () => <Skeleton className="h-[280px] w-full rounded-md" />;
 
+const BusinessEvolutionChart = dynamic(
+  () =>
+    import("@/components/dashboard/charts/business-evolution-chart").then(
+      (m) => m.BusinessEvolutionChart
+    ),
+  { loading: chartFallback }
+);
+const TeacherRankingChart = dynamic(
+  () =>
+    import("@/components/dashboard/charts/teacher-ranking-chart").then(
+      (m) => m.TeacherRankingChart
+    ),
+  { loading: chartFallback }
+);
+const StudentsByTeacherChart = dynamic(
+  () =>
+    import("@/components/dashboard/charts/students-by-teacher-chart").then(
+      (m) => m.StudentsByTeacherChart
+    ),
+  { loading: chartFallback }
+);
 const ClassesByDayChart = dynamic(
   () =>
     import("@/components/dashboard/charts/classes-by-day-chart").then((m) => m.ClassesByDayChart),
@@ -112,7 +134,6 @@ const TeachersCancellationsChart = dynamic(
     ),
   { loading: chartFallback }
 );
-import { CancellationKpisCards } from "@/components/dashboard/cancellation-kpis-cards";
 const CancellationReasonsChart = dynamic(
   () =>
     import("@/components/dashboard/charts/cancellation-reasons-chart").then(
@@ -186,6 +207,8 @@ import type {
   IndividualVsSharedTotalsRow,
   ExecutiveSummaryKpis,
   TeacherRankingRow,
+  BusinessEvolutionRow,
+  StudentsByTeacherRow,
 } from "@/features/dashboard/types";
 import {
   dayCountTable,
@@ -196,17 +219,6 @@ import {
   timeSlotCountTable,
   weekdayCountTable,
 } from "@/lib/chart-summaries";
-import {
-  Users,
-  UserCheck,
-  UserX,
-  AlertTriangle,
-  GraduationCap,
-  Calendar,
-  ClipboardList,
-  Layers,
-  TrendingUp,
-} from "lucide-react";
 
 export type DashboardTabsContentProps = {
   kpis: DashboardKpis | null;
@@ -227,7 +239,6 @@ export type DashboardTabsContentProps = {
   cancellationKpis: CancellationKpisRow | null;
   cancellationReasons: CancellationReasonRow[];
   cancellationsBySource: CancellationSourceRow[];
-  /** Slot streamed aparte (RPC pesada) para no bloquear el resto del detalle. */
   studentRankingSlot: ReactNode;
   cancellationsByMonth: CancellationsByMonthRow[];
   cancellationsByTeacherOverTime: CancellationsByTeacherOverTimeRow[];
@@ -238,10 +249,10 @@ export type DashboardTabsContentProps = {
   topWeekday: string | null;
   topClassType: string | null;
   topTeacherByAvg: string | null;
-  /** Opcional: para insights narrativos. Ya fetcheado en DashboardPreviewSection. */
   executiveSummaryKpis?: ExecutiveSummaryKpis | null;
-  /** Opcional: para insights de profesor. Ya fetcheado en DashboardPreviewSection. */
+  businessEvolution: BusinessEvolutionRow[];
   teacherRanking?: TeacherRankingRow[] | null;
+  studentsByTeacher: StudentsByTeacherRow[];
 };
 
 export function DashboardTabsContent(props: DashboardTabsContentProps) {
@@ -255,61 +266,321 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
   const cancelTimeTable = timeSlotCountTable(props.cancellationsByTimeSlot);
 
   return (
-    <div className="w-full space-y-10">
-      {/* ===================== KPIs ===================== */}
-      {/* <section className="space-y-3">
-        <h2 className="text-lg font-semibold">KPIs principales</h2>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <KpiCard title="Total alumnos" value={kpis?.total_students ?? 0} icon={Users} />
-          <KpiCard
-            title="Alumnos activos"
-            value={kpis?.active_students ?? 0}
-            subtitle="En el período seleccionado"
-            icon={UserCheck}
-          />
-          <KpiCard title="Alumnos inactivos" value={kpis?.inactive_students ?? 0} icon={UserX} />
-          <KpiCard
-            title="En riesgo de abandono"
-            value={kpis?.at_risk_students ?? 0}
-            subtitle="Sin asistir 14+ días"
-            icon={AlertTriangle}
-          />
-          <KpiCard
-            title="Profesores activos"
-            value={kpis?.total_teachers ?? 0}
-            icon={GraduationCap}
-          />
-          <KpiCard title="Clases en período" value={kpis?.total_classes ?? 0} icon={Calendar} />
-          <KpiCard
-            title="Total asistencias"
-            value={kpis?.total_attendances ?? 0}
-            icon={ClipboardList}
-          />
-          <KpiCard
-            title="Prom. alumnos por clase"
-            value={kpis ? kpis.avg_attendances_per_class.toFixed(1) : "0"}
-            icon={TrendingUp}
-          />
-          <KpiCard title="Tipos de clase" value={kpis?.class_types_count ?? 0} icon={Layers} />
-          <KpiCard
-            title="Tasa de actividad"
-            value={kpis ? `${kpis.activity_rate.toFixed(1)}%` : "0%"}
-            subtitle="Activos / total alumnos"
-          />
+    <Tabs defaultValue="ejecutivo" className="w-full space-y-6">
+      <div className="flex items-center justify-between border-b border-border/80 pb-3">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-2xl h-auto p-1 bg-muted/50 border border-border/60">
+          <TabsTrigger value="ejecutivo" className="text-[13px] py-1.5 font-medium">
+            Resumen Ejecutivo
+          </TabsTrigger>
+          <TabsTrigger value="asistencias" className="text-[13px] py-1.5 font-medium">
+            Asistencias y Clases
+          </TabsTrigger>
+          <TabsTrigger value="alumnos-profesores" className="text-[13px] py-1.5 font-medium">
+            Alumnos y Profesores
+          </TabsTrigger>
+          <TabsTrigger value="cancelaciones" className="text-[13px] py-1.5 font-medium">
+            Cancelaciones
+          </TabsTrigger>
+        </TabsList>
+      </div>
+
+      <TabsContent value="ejecutivo" className="mt-0 space-y-5">
+        {/* Fila: Evolución del negocio (Ancho completo) */}
+        <SectionCard
+          title="Evolución del negocio"
+          description="Clases, horas, alumnos activos, nuevos alumnos y cancelaciones"
+        >
+          <BusinessEvolutionChart data={props.businessEvolution} />
+        </SectionCard>
+
+        {/* Fila: Cancelaciones por origen (50%) + Motivos de cancelación (50%) */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SectionCard
+            title="Cancelaciones por origen"
+            description="Alumno / Profesor / Clima / Otros"
+            chartSummary={genericCountSummary(
+              props.cancellationsBySource,
+              "Sin cancelaciones registradas.",
+              "cancelaciones"
+            )}
+          >
+            <CancellationsBySourceDonut data={props.cancellationsBySource} />
+          </SectionCard>
+
+          <SectionCard
+            title="Motivos de cancelación (Top 5)"
+            description="Faltas registradas con motivo"
+            chartSummary={genericCountSummary(
+              props.cancellationReasons,
+              "Sin motivos de cancelación registrados.",
+              "faltas"
+            )}
+          >
+            <CancellationReasonsChart data={props.cancellationReasons} />
+          </SectionCard>
         </div>
-      </section> */}
 
-      {/* ============ Cancelaciones y comportamiento ============ */}
-      <section className="space-y-6">
-        <h2 className="text-lg font-semibold">Cancelaciones y comportamiento</h2>
+        {/* Fila: Ranking de profesores (50%) + Alumnos por profesor (50%) */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SectionCard
+            title="Ranking de profesores (por clases)"
+            description="Clases dictadas en el período"
+            chartSummary={`Ranking de ${props.teachersPerformance.length} profesores.`}
+          >
+            <TeacherRankingChart data={props.teacherRanking ?? []} />
+          </SectionCard>
 
-        {/* <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">KPIs</h3>
-          <CancellationKpisCards data={props.cancellationKpis} />
-        </div> */}
+          <SectionCard
+            title="Alumnos por profesor"
+            description="Distribución de alumnos"
+            chartSummary={`Distribución entre ${props.studentsByTeacher.length} profesores.`}
+          >
+            <StudentsByTeacherChart data={props.studentsByTeacher} />
+          </SectionCard>
+        </div>
+
+        {/* Fila: Estado de alumnos (50%) + Actividad semanal (50%) */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SectionCard
+            title="Estado de alumnos"
+            description="Activos / En riesgo / Inactivos"
+            chartSummary={`Composición de alumnos: ${props.studentsActivity.length} categorías.`}
+          >
+            <StudentsActivityDonutChart data={props.studentsActivity} />
+          </SectionCard>
+
+          <SectionCard
+            title="Actividad semanal (por día)"
+            description="Concurrencia por día de la semana"
+            chartSummary={summarizeWeekdayCounts(props.attendanceByWeekday, "asistencias")}
+          >
+            <AttendanceByWeekdayChart data={props.attendanceByWeekday} />
+          </SectionCard>
+        </div>
+
+        {/* 1. Insights del período (100% width) */}
+        <SectionCard title="Insights del período" description="Lectura rápida de métricas clave">
+          <BusinessInsights
+            kpis={kpis}
+            topTimeSlot={topTimeSlot}
+            topWeekday={topWeekday}
+            topClassType={topClassType}
+            topTeacherByAvg={topTeacherByAvg}
+            executiveSummaryKpis={props.executiveSummaryKpis}
+            teacherRanking={props.teacherRanking}
+          />
+        </SectionCard>
+
+        {/* 2. Profesores con más cancelaciones (100% width) */}
+        <SectionCard
+          title="Profesores con más cancelaciones"
+          description="Clases canceladas por profesor"
+          chartSummary={`Ranking de ${props.teachersCancellationsRanking.length} profesores.`}
+        >
+          <TeachersCancellationsChart
+            data={props.teachersCancellationsRanking}
+            teacherRanking={props.teacherRanking ?? undefined}
+          />
+        </SectionCard>
+
+        {/* 3. Ranking de alumnos (100% width) */}
+        <div className="w-full">{props.studentRankingSlot}</div>
+      </TabsContent>
+
+      <TabsContent value="asistencias" className="mt-0 space-y-6">
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Actividad de clases y patrones de concurrencia
+          </h3>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SectionCard
+              title="Clases por día"
+              description="Evolución de clases dictadas"
+              chartSummary={summarizeDayCounts(props.classesByDay, "clases")}
+              chartTableHeaders={classesByDayTable.headers}
+              chartTableRows={classesByDayTable.rows}
+            >
+              <ClassesByDayChart data={props.classesByDay} />
+            </SectionCard>
+            <SectionCard
+              title="Asistencias por día"
+              description="Evolución diaria de asistencia"
+              chartSummary={summarizeDayCounts(props.attendanceByDay, "asistencias")}
+              chartTableHeaders={attendanceByDayTable.headers}
+              chartTableRows={attendanceByDayTable.rows}
+            >
+              <AttendanceByDayChart data={props.attendanceByDay} />
+            </SectionCard>
+            <SectionCard
+              title="Día de la semana con más asistencia"
+              description="Patrones semanales de concurrencia"
+              chartSummary={summarizeWeekdayCounts(props.attendanceByWeekday, "asistencias")}
+              chartTableHeaders={attendanceWeekdayTable.headers}
+              chartTableRows={attendanceWeekdayTable.rows}
+            >
+              <AttendanceByWeekdayChart data={props.attendanceByWeekday} />
+            </SectionCard>
+            <SectionCard
+              title="Franja horaria con más asistencia"
+              description="Horarios con mayor demanda"
+              chartSummary={summarizeTimeSlotCounts(props.attendanceByTimeSlot, "asistencias")}
+              chartTableHeaders={attendanceTimeTable.headers}
+              chartTableRows={attendanceTimeTable.rows}
+            >
+              <AttendanceByTimeSlotChart data={props.attendanceByTimeSlot} />
+            </SectionCard>
+          </div>
+        </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Tendencia en el tiempo</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Análisis por tipo de clase
+          </h3>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SectionCard
+              title="Tipo de clase con más asistencia"
+              chartSummary={`Rendimiento por tipo de clase (${props.classTypePerformance.length} tipos).`}
+            >
+              <ClassTypePerformanceChart data={props.classTypePerformance} />
+            </SectionCard>
+            <SectionCard
+              title="Distribución de clases por tipo"
+              chartSummary={`Distribución proporcional de ${props.classTypePerformance.length} tipos de clase.`}
+            >
+              <ClassTypeDistributionDonut data={props.classTypePerformance} />
+            </SectionCard>
+          </div>
+          <SectionCard
+            title="Evolución de asistencia por tipo"
+            description="Distribución temporal de concurrencia"
+            chartSummary={`Serie temporal de asistencias por tipo (${props.attendanceByClassTypeOverTime.length} registros).`}
+          >
+            <AttendanceByClassTypeStackedChart data={props.attendanceByClassTypeOverTime} />
+          </SectionCard>
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Clases individuales vs grupales
+          </h3>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SectionCard
+              title="Distribución global"
+              description="Total individual vs grupal en el período"
+              chartSummary={
+                props.individualVsSharedTotals
+                  ? `Individual: ${props.individualVsSharedTotals.individual_total}, grupal: ${props.individualVsSharedTotals.shared_total}.`
+                  : "Sin datos de clases individuales vs grupales."
+              }
+            >
+              <IndividualVsSharedGlobalChart data={props.individualVsSharedTotals} />
+            </SectionCard>
+            <SectionCard
+              title="Por profesor"
+              description="Comparación por profesor a cargo"
+              chartSummary={`Comparación individual vs grupal para ${props.individualVsSharedByTeacher.length} profesores.`}
+            >
+              <IndividualVsSharedByTeacherChart data={props.individualVsSharedByTeacher} />
+            </SectionCard>
+          </div>
+          <SectionCard
+            title="Evolución en el tiempo"
+            description="Tendencia y proporción"
+            chartSummary={`Evolución de clases individuales y grupales (${props.individualVsSharedOverTime.length} períodos).`}
+          >
+            <IndividualVsSharedOverTimeStackedAreaChart data={props.individualVsSharedOverTime} />
+          </SectionCard>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="alumnos-profesores" className="mt-0 space-y-6">
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Análisis y retención de alumnos
+          </h3>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <SectionCard
+              title="Activos / Inactivos / Riesgo"
+              description="Estado actual de la base de alumnos"
+              chartSummary={`Composición de alumnos: ${props.studentsActivity.length} categorías en el gráfico.`}
+            >
+              <StudentsActivityDonutChart data={props.studentsActivity} />
+            </SectionCard>
+            <SectionCard
+              title="Nuevos alumnos por mes"
+              description="Ritmo de adquisición"
+              chartSummary={genericCountSummary(
+                props.newStudentsByMonth,
+                "Sin nuevos alumnos en el período.",
+                "altas"
+              )}
+            >
+              <NewStudentsByMonthChart data={props.newStudentsByMonth} />
+            </SectionCard>
+            <SectionCard
+              title="Evolución de alumnos activos"
+              description="Comportamiento diario de los últimos 15 días"
+              chartSummary={`Evolución diaria de alumnos activos (${props.activeStudentsEvolution.length} días).`}
+            >
+              <ActiveStudentsEvolutionChart data={props.activeStudentsEvolution} />
+            </SectionCard>
+          </div>
+          {props.studentRankingSlot}
+        </div>
+
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Rendimiento de profesores
+          </h3>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <SectionCard
+              title="Profesores con más clases"
+              description="Total dictadas en el período"
+              chartSummary={`Comparación de clases dictadas entre ${props.teachersPerformance.length} profesores.`}
+            >
+              <TeacherPerformanceBars
+                data={props.teachersPerformance}
+                metric="classes_count"
+                title="Clases"
+              />
+            </SectionCard>
+            <SectionCard
+              title="Profesores con más asistencias"
+              description="Volumen de alumnos recibidos"
+              chartSummary={`Total de asistencias por profesor (${props.teachersPerformance.length} profesores).`}
+            >
+              <TeacherPerformanceBars
+                data={props.teachersPerformance}
+                metric="total_attendances"
+                title="Asistencias"
+              />
+            </SectionCard>
+            <SectionCard
+              title="Promedio por clase"
+              description="Alumnos por clase por profesor"
+              chartSummary={`Promedio de alumnos por clase para ${props.teachersPerformance.length} profesores.`}
+            >
+              <TeacherPerformanceBars
+                data={props.teachersPerformance}
+                metric="avg_per_class"
+                title="Prom. por clase"
+              />
+            </SectionCard>
+          </div>
+          <SectionCard
+            title="Ranking detallado de profesores"
+            description="Tabla completa ordenable"
+          >
+            <TeachersRankingTable data={props.teachersPerformance} />
+          </SectionCard>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="cancelaciones" className="mt-0 space-y-6">
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Tendencia de cancelaciones
+          </h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Cancelaciones por mes"
@@ -324,15 +595,18 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
             </SectionCard>
             <SectionCard
               title="Cancelaciones por profesor en el tiempo"
-              description="Multi-línea si hay ≤5 profesores; filtro si hay más"
+              description="Evolución temporal discriminada"
               chartSummary={`Serie temporal de cancelaciones por profesor (${props.cancellationsByTeacherOverTime.length} puntos de datos).`}
             >
               <CancellationsByTeacherOverTimeChart data={props.cancellationsByTeacherOverTime} />
             </SectionCard>
           </div>
         </div>
+
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Rankings</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Rankings de cancelaciones
+          </h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Alumnos que más clases cancelaron"
@@ -351,11 +625,13 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           </div>
         </div>
 
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Motivos de cancelación</h3>
+        <div className="space-y-4 w-full">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Motivos y orígenes de cancelación
+          </h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
-              title="Cancelaciones por quién"
+              title="Cancelaciones por origen"
               description="Alumno / Profesor / Clima / Otros"
               chartSummary={genericCountSummary(
                 props.cancellationsBySource,
@@ -366,8 +642,8 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
               <CancellationsBySourceDonut data={props.cancellationsBySource} />
             </SectionCard>
             <SectionCard
-              title="Motivos de cancelación (faltas de alumnos)"
-              description="Categoría «Otro» mostrada de forma independiente"
+              title="Motivos de falta de alumnos"
+              description="Categorías declaradas"
               chartSummary={genericCountSummary(
                 props.cancellationReasons,
                 "Sin motivos de cancelación registrados.",
@@ -380,7 +656,9 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Patrones (día y hora)</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            Patrones por día y horario
+          </h3>
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard
               title="Día con más cancelaciones"
@@ -402,198 +680,7 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
             </SectionCard>
           </div>
         </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Clases individuales vs grupales
-          </h3>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SectionCard
-              title="Distribución global"
-              description="Total individual vs grupal en el período"
-              chartSummary={
-                props.individualVsSharedTotals
-                  ? `Individual: ${props.individualVsSharedTotals.individual_total}, grupal: ${props.individualVsSharedTotals.shared_total}.`
-                  : "Sin datos de clases individuales vs grupales."
-              }
-            >
-              <IndividualVsSharedGlobalChart data={props.individualVsSharedTotals} />
-            </SectionCard>
-            <SectionCard
-              title="Por profesor"
-              description="Barras agrupadas por profesor"
-              chartSummary={`Comparación individual vs grupal para ${props.individualVsSharedByTeacher.length} profesores.`}
-            >
-              <IndividualVsSharedByTeacherChart data={props.individualVsSharedByTeacher} />
-            </SectionCard>
-          </div>
-          <SectionCard
-            title="Evolución en el tiempo"
-            description="Tendencia y proporción (área apilada)"
-            chartSummary={`Evolución de clases individuales y grupales (${props.individualVsSharedOverTime.length} períodos).`}
-          >
-            <IndividualVsSharedOverTimeStackedAreaChart data={props.individualVsSharedOverTime} />
-          </SectionCard>
-        </div>
-      </section>
-
-      {/* ===================== Asistencias ===================== */}
-      <section className="space-y-6">
-        <h2 className="text-lg font-semibold">Asistencias</h2>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Actividad de clases</h3>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SectionCard
-              title="Clases por día"
-              description="Evolución de clases dictadas"
-              chartSummary={summarizeDayCounts(props.classesByDay, "clases")}
-              chartTableHeaders={classesByDayTable.headers}
-              chartTableRows={classesByDayTable.rows}
-            >
-              <ClassesByDayChart data={props.classesByDay} />
-            </SectionCard>
-            <SectionCard
-              title="Asistencias por día"
-              description="Evolución de asistencias"
-              chartSummary={summarizeDayCounts(props.attendanceByDay, "asistencias")}
-              chartTableHeaders={attendanceByDayTable.headers}
-              chartTableRows={attendanceByDayTable.rows}
-            >
-              <AttendanceByDayChart data={props.attendanceByDay} />
-            </SectionCard>
-            <SectionCard
-              title="Día de la semana con más asistencia"
-              description="Patrones semanales"
-              chartSummary={summarizeWeekdayCounts(props.attendanceByWeekday, "asistencias")}
-              chartTableHeaders={attendanceWeekdayTable.headers}
-              chartTableRows={attendanceWeekdayTable.rows}
-            >
-              <AttendanceByWeekdayChart data={props.attendanceByWeekday} />
-            </SectionCard>
-            <SectionCard
-              title="Franja horaria con más asistencia"
-              description="Horas pico"
-              chartSummary={summarizeTimeSlotCounts(props.attendanceByTimeSlot, "asistencias")}
-              chartTableHeaders={attendanceTimeTable.headers}
-              chartTableRows={attendanceTimeTable.rows}
-            >
-              <AttendanceByTimeSlotChart data={props.attendanceByTimeSlot} />
-            </SectionCard>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Análisis de alumnos</h3>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SectionCard
-              title="Activos / Inactivos / Riesgo"
-              description="Composición de la base"
-              chartSummary={`Composición de alumnos: ${props.studentsActivity.length} categorías en el gráfico.`}
-            >
-              <StudentsActivityDonutChart data={props.studentsActivity} />
-            </SectionCard>
-            <SectionCard
-              title="Nuevos alumnos por mes"
-              description="Adquisición"
-              chartSummary={genericCountSummary(
-                props.newStudentsByMonth,
-                "Sin nuevos alumnos en el período.",
-                "altas"
-              )}
-            >
-              <NewStudentsByMonthChart data={props.newStudentsByMonth} />
-            </SectionCard>
-            <SectionCard
-              title="Evolución de alumnos activos"
-              description="Últimos 15 días por día"
-              chartSummary={`Evolución diaria de alumnos activos (${props.activeStudentsEvolution.length} días).`}
-            >
-              <ActiveStudentsEvolutionChart data={props.activeStudentsEvolution} />
-            </SectionCard>
-          </div>
-          {props.studentRankingSlot}
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Rendimiento de profesores</h3>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <SectionCard
-              title="Profesores con más clases"
-              description="En el período"
-              chartSummary={`Comparación de clases dictadas entre ${props.teachersPerformance.length} profesores.`}
-            >
-              <TeacherPerformanceBars
-                data={props.teachersPerformance}
-                metric="classes_count"
-                title="Clases"
-              />
-            </SectionCard>
-            <SectionCard
-              title="Profesores con más asistencias"
-              chartSummary={`Total de asistencias por profesor (${props.teachersPerformance.length} profesores).`}
-            >
-              <TeacherPerformanceBars
-                data={props.teachersPerformance}
-                metric="total_attendances"
-                title="Asistencias"
-              />
-            </SectionCard>
-            <SectionCard
-              title="Promedio de alumnos por clase por profesor"
-              chartSummary={`Promedio de alumnos por clase para ${props.teachersPerformance.length} profesores.`}
-            >
-              <TeacherPerformanceBars
-                data={props.teachersPerformance}
-                metric="avg_per_class"
-                title="Prom. por clase"
-              />
-            </SectionCard>
-          </div>
-          <SectionCard title="Ranking detallado" description="Ordenable por columnas">
-            <TeachersRankingTable data={props.teachersPerformance} />
-          </SectionCard>
-        </div>
-
-        <div className="space-y-4">
-          <h3 className="text-sm font-medium text-muted-foreground">Análisis por tipo de clase</h3>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <SectionCard
-              title="Tipo de clase con más asistencia"
-              chartSummary={`Rendimiento por tipo de clase (${props.classTypePerformance.length} tipos).`}
-            >
-              <ClassTypePerformanceChart data={props.classTypePerformance} />
-            </SectionCard>
-            <SectionCard
-              title="Distribución de clases por tipo"
-              chartSummary={`Distribución proporcional de ${props.classTypePerformance.length} tipos de clase.`}
-            >
-              <ClassTypeDistributionDonut data={props.classTypePerformance} />
-            </SectionCard>
-          </div>
-          <SectionCard
-            title="Evolución de asistencia por tipo"
-            description="Área apilada por tipo de clase"
-            chartSummary={`Serie temporal de asistencias por tipo (${props.attendanceByClassTypeOverTime.length} registros).`}
-          >
-            <AttendanceByClassTypeStackedChart data={props.attendanceByClassTypeOverTime} />
-          </SectionCard>
-        </div>
-      </section>
-
-      {/* ===================== Insights del negocio ===================== */}
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold">Insights del negocio</h2>
-        <BusinessInsights
-          kpis={kpis}
-          topTimeSlot={topTimeSlot}
-          topWeekday={topWeekday}
-          topClassType={topClassType}
-          topTeacherByAvg={topTeacherByAvg}
-          executiveSummaryKpis={props.executiveSummaryKpis}
-          teacherRanking={props.teacherRanking}
-        />
-      </section>
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }

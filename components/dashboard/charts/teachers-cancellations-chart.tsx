@@ -36,7 +36,7 @@ export function TeachersCancellationsChart({
   // Índice de clases por profesor si tenemos el ranking — sin fetch
   const classesById = new Map((teacherRanking ?? []).map((r) => [r.teacher_id, r.classes_count]));
 
-  const sorted = [...data].sort((a, b) => b.cancellation_count - a.cancellation_count);
+  const sorted = [...data].sort((a, b) => b.cancellation_count - a.cancellation_count).slice(0, 5);
 
   return (
     <div className="space-y-2">

@@ -34,12 +34,12 @@ export function KpiCard({
         {Icon && (
           <div
             className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md shrink-0",
+              "flex h-8 w-8 items-center justify-center rounded-full shrink-0 shadow-sm",
               iconCircle || "text-muted-foreground/70 bg-muted/50"
             )}
             aria-hidden
           >
-            <Icon className="h-3.5 w-3.5" />
+            <Icon className="h-4 w-4" />
           </div>
         )}
       </CardHeader>

@@ -23,16 +23,21 @@ export function AttendanceByWeekdayChart({
   }
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+    <ResponsiveContainer width="100%" height={180}>
+      <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={colors.border} vertical={false} />
-        <XAxis dataKey="weekday_name" tick={{ fontSize: 11 }} tickLine={false} />
+        <XAxis
+          dataKey="weekday_name"
+          tick={{ fontSize: 10 }}
+          tickLine={false}
+          tickFormatter={(v: string) => (v ? v.slice(0, 3) : "")}
+        />
         <YAxis
           allowDecimals={false}
-          tick={{ fontSize: 11 }}
+          tick={{ fontSize: 10 }}
           tickLine={false}
           axisLine={false}
-          width={28}
+          width={24}
         />
         <Tooltip
           contentStyle={{

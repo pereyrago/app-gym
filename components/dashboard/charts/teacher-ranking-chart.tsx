@@ -82,13 +82,13 @@ export function TeacherRankingChart({
         </div>
 
         {/* Filas */}
-        {sorted.map((row) => {
+        {sorted.slice(0, 5).map((row) => {
           const rank = sorted.indexOf(row) + 1;
           const widthPct = max > 0 ? Math.round((row[activeMetric.key] / max) * 100) : 0;
           return (
             <div
               key={row.teacher_id}
-              className="grid grid-cols-[1.5rem_1fr_auto] items-center gap-x-2 px-1"
+              className="grid grid-cols-[1.25rem_1fr_auto] items-center gap-x-2 px-1"
             >
               {/* Rank */}
               <span className="text-[12px] font-medium tabular-nums text-muted-foreground">

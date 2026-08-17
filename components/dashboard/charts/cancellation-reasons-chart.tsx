@@ -36,9 +36,11 @@ export function CancellationReasonsChart({
 
         return (
           <li key={row.reason_key} className="space-y-1">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[13px] font-medium leading-none">{row.reason_label}</span>
-              <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-[13px] font-medium leading-none truncate min-w-0">
+                {row.reason_label}
+              </span>
+              <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground font-medium">
                 {row.count}
               </span>
             </div>

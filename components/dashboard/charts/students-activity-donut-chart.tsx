@@ -46,17 +46,17 @@ export function StudentsActivityDonutChart({
   }).filter((d) => d.value > 0);
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-col sm:flex-row items-center justify-around gap-3 w-full py-1">
       {/* Dona con total en el centro */}
       <div className="relative shrink-0">
-        <ResponsiveContainer width={160} height={160}>
+        <ResponsiveContainer width={136} height={136}>
           <PieChart>
             <Pie
               data={chartData}
               cx="50%"
               cy="50%"
-              innerRadius={52}
-              outerRadius={74}
+              innerRadius={44}
+              outerRadius={64}
               paddingAngle={2}
               dataKey="value"
               nameKey="name"
@@ -87,28 +87,26 @@ export function StudentsActivityDonutChart({
           className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center"
           aria-hidden
         >
-          <span className="text-2xl font-bold tabular-nums leading-none">{total}</span>
-          <span className="text-[11px] text-muted-foreground">Total</span>
+          <span className="text-xl font-bold tabular-nums leading-none">{total}</span>
+          <span className="text-[10px] text-muted-foreground">Total</span>
         </div>
       </div>
 
       {/* Leyenda custom */}
-      <ul className="flex flex-col gap-2" aria-label="Estado de alumnos">
+      <ul className="flex flex-col gap-1.5 flex-1 min-w-0" aria-label="Estado de alumnos">
         {chartData.map((d) => {
           const pct = Math.round((d.value / total) * 100);
           return (
-            <li key={d.status} className="space-y-0">
-              <div className="flex items-center gap-2">
-                <span
-                  className="h-3 w-3 shrink-0 rounded-full"
-                  style={{ backgroundColor: d.color }}
-                  aria-hidden
-                />
-                <span className="text-[13px] text-foreground">{d.short}</span>
-              </div>
-              <p className="pl-5 text-[12px] text-muted-foreground tabular-nums">
+            <li key={d.status} className="flex items-center gap-1.5 text-xs">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: d.color }}
+                aria-hidden
+              />
+              <span className="truncate text-foreground font-medium">{d.short}</span>
+              <span className="ml-auto shrink-0 text-muted-foreground tabular-nums font-medium">
                 {d.value} ({pct}%)
-              </p>
+              </span>
             </li>
           );
         })}

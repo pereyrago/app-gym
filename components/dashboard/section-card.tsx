@@ -37,12 +37,14 @@ export function SectionCard({
     );
 
   return (
-    <Card className={cn("border border-border/80 shadow-none", className)}>
-      <CardHeader className="space-y-1 p-4 pb-2">
-        <CardTitle className="text-base font-semibold text-pretty">{title}</CardTitle>
-        {description && <p className="text-ui text-muted-foreground">{description}</p>}
+    <Card className={cn("border border-border/80 shadow-none h-full flex flex-col", className)}>
+      <CardHeader className="space-y-1 p-4 pb-2.5">
+        <CardTitle className="text-base font-semibold leading-snug text-pretty">{title}</CardTitle>
+        {description && (
+          <p className="text-ui text-muted-foreground leading-normal">{description}</p>
+        )}
       </CardHeader>
-      <CardContent className="p-4 pt-0">{body}</CardContent>
+      <CardContent className="p-4 pt-0 flex-1 flex flex-col justify-between">{body}</CardContent>
     </Card>
   );
 }

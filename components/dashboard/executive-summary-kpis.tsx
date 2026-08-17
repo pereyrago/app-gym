@@ -2,7 +2,7 @@
 
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import type { ExecutiveKpiMetric, ExecutiveSummaryKpis } from "@/features/dashboard/types";
-import { Users, UserPlus, Calendar, Clock, XCircle, CheckCircle2 } from "lucide-react";
+import { Users, UserPlus, BarChart3, Clock, XCircle, CheckCircle2 } from "lucide-react";
 
 type ExecutiveSummaryKpisProps = {
   data: ExecutiveSummaryKpis | null;
@@ -47,7 +47,7 @@ export function ExecutiveSummaryKpisSection({
           trend={trendFromVariation(data.activeStudents.variationPct)}
           trendLabel={trendLabel(data.activeStudents)}
           icon={Users}
-          iconCircle="bg-violet-500/20 text-violet-400"
+          iconCircle="bg-indigo-600 text-white dark:bg-indigo-500/25 dark:text-indigo-300"
         />
         <KpiCard
           title="Nuevos alumnos"
@@ -55,15 +55,15 @@ export function ExecutiveSummaryKpisSection({
           trend={trendFromVariation(data.newStudents.variationPct)}
           trendLabel={trendLabel(data.newStudents)}
           icon={UserPlus}
-          iconCircle="bg-emerald-500/20 text-emerald-400"
+          iconCircle="bg-emerald-600 text-white dark:bg-emerald-500/25 dark:text-emerald-300"
         />
         <KpiCard
           title="Clases realizadas"
           value={data.classes.current}
           trend={trendFromVariation(data.classes.variationPct)}
           trendLabel={trendLabel(data.classes)}
-          icon={Calendar}
-          iconCircle="bg-blue-500/20 text-blue-400"
+          icon={BarChart3}
+          iconCircle="bg-blue-600 text-white dark:bg-blue-500/25 dark:text-blue-300"
         />
         <KpiCard
           title="Horas trabajadas"
@@ -71,7 +71,7 @@ export function ExecutiveSummaryKpisSection({
           trend={trendFromVariation(data.hours.variationPct)}
           trendLabel={trendLabel(data.hours)}
           icon={Clock}
-          iconCircle="bg-amber-500/20 text-amber-400"
+          iconCircle="bg-amber-500 text-white dark:bg-amber-500/25 dark:text-amber-300"
         />
         <KpiCard
           title="Cancelaciones"
@@ -80,7 +80,7 @@ export function ExecutiveSummaryKpisSection({
           trend={trendFromVariation(data.cancellations.variationPct, true)}
           trendLabel={trendLabel(data.cancellations)}
           icon={XCircle}
-          iconCircle="bg-red-500/20 text-red-400"
+          iconCircle="bg-rose-600 text-white dark:bg-rose-500/25 dark:text-rose-300"
         />
         <KpiCard
           title="Asistencia"
@@ -88,7 +88,7 @@ export function ExecutiveSummaryKpisSection({
           trend={trendFromVariation(data.attendanceRatePct.variationPct)}
           trendLabel={trendLabel(data.attendanceRatePct)}
           icon={CheckCircle2}
-          iconCircle="bg-sky-500/20 text-sky-400"
+          iconCircle="bg-sky-600 text-white dark:bg-sky-500/25 dark:text-sky-300"
         />
       </div>
     </section>

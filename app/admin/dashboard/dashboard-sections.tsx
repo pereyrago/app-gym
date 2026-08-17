@@ -36,9 +36,10 @@ import type {
   DashboardFilters,
   ExecutiveSummaryKpis,
   TeacherRankingRow,
+  BusinessEvolutionRow,
+  StudentsByTeacherRow,
 } from "@/features/dashboard/types";
 import { ExecutiveSummaryKpisSection } from "@/components/dashboard/executive-summary-kpis";
-import { BusinessPerformanceSection } from "@/components/dashboard/business-performance-section";
 import { DashboardTabsContent } from "@/components/dashboard/dashboard-tabs-content";
 import { StudentsRankingTable } from "@/components/dashboard/students-ranking-table";
 import { SectionCard } from "@/components/dashboard/section-card";
@@ -70,16 +71,13 @@ export async function DashboardPreviewSection({ filters }: { filters: DashboardF
   return (
     <>
       <ExecutiveSummaryKpisSection data={executiveSummaryKpis} />
-      <BusinessPerformanceSection
-        businessEvolution={businessEvolution}
-        teacherRanking={teacherRanking}
-        studentsByTeacher={studentsByTeacher}
-      />
       <Suspense fallback={detailsFallback}>
         <DashboardDetailsSection
           filters={filters}
           executiveSummaryKpis={executiveSummaryKpis}
+          businessEvolution={businessEvolution}
           teacherRanking={teacherRanking}
+          studentsByTeacher={studentsByTeacher}
         />
       </Suspense>
     </>
@@ -89,11 +87,15 @@ export async function DashboardPreviewSection({ filters }: { filters: DashboardF
 async function DashboardDetailsSection({
   filters,
   executiveSummaryKpis,
+  businessEvolution,
   teacherRanking,
+  studentsByTeacher,
 }: {
   filters: DashboardFilters;
   executiveSummaryKpis: ExecutiveSummaryKpis | null;
+  businessEvolution: BusinessEvolutionRow[];
   teacherRanking: TeacherRankingRow[];
+  studentsByTeacher: StudentsByTeacherRow[];
 }) {
   const supabase = await createClient();
   const [
@@ -181,7 +183,9 @@ async function DashboardDetailsSection({
       topClassType={topClassType}
       topTeacherByAvg={topTeacherByAvg}
       executiveSummaryKpis={executiveSummaryKpis}
+      businessEvolution={businessEvolution}
       teacherRanking={teacherRanking}
+      studentsByTeacher={studentsByTeacher}
       studentRankingSlot={
         <Suspense fallback={rankingFallback}>
           <StudentRankingSection filters={filters} />

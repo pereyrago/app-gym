@@ -78,7 +78,10 @@ export default async function AdminDashboardPage({
             <ArrowLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <DashboardHeader />
+        <DashboardHeader
+          title="Dashboard Ejecutivo"
+          description="Resumen general de la operación"
+        />
       </div>
 
       <DashboardFiltersClient
