@@ -29,7 +29,7 @@ export default async function TeacherClassDetailPage({ params }: PageProps) {
 
   const attendedIds = new Set((classData.class_attendances ?? []).map((a) => a.student_id));
   const initialAbsentIds = absenceDetails.map((a) => a.student_id);
-  const displayStatus = attendedIds.size > 0 ? "success" : (classData.status ?? "success");
+  const displayStatus = classData.status ?? "success";
 
   return (
     <div className="space-y-6">

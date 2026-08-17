@@ -10,7 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { format, parseISO, startOfWeek, startOfMonth, startOfYear, getISOWeek } from "date-fns";
+import { format, parseISO, startOfWeek, endOfWeek, startOfMonth, startOfYear } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Select,
@@ -105,9 +105,16 @@ function aggregate(
 
       let label: string;
       switch (granularity) {
-        case "week":
-          label = `Sem. ${getISOWeek(periodStart)}`;
+        case "week": {
+          const periodEnd = endOfWeek(periodStart, { weekStartsOn: 1 });
+          const sameMonth = periodStart.getMonth() === periodEnd.getMonth();
+          if (sameMonth) {
+            label = `${format(periodStart, "d")} - ${format(periodEnd, "d MMM", { locale: es })}`;
+          } else {
+            label = `${format(periodStart, "d MMM", { locale: es })} - ${format(periodEnd, "d MMM", { locale: es })}`;
+          }
           break;
+        }
         case "month":
           label = format(periodStart, "MMM yyyy", { locale: es });
           label = label.charAt(0).toUpperCase() + label.slice(1);
@@ -155,7 +162,12 @@ export function BusinessEvolutionChart({
     const row = payload?.[0]?.payload;
     if (!row) return "";
     if (granularity === "day" && row.day) {
-      return format(parseISO(row.day), "EEEE d MMMM", { locale: es });
+      return format(parseISO(row.day), "EEEE d 'de' MMMM yyyy", { locale: es });
+    }
+    if (granularity === "week" && row.day) {
+      const start = parseISO(row.day);
+      const end = endOfWeek(start, { weekStartsOn: 1 });
+      return `Semana del ${format(start, "d 'de' MMMM", { locale: es })} al ${format(end, "d 'de' MMMM yyyy", { locale: es })}`;
     }
     return row.label ?? "";
   };

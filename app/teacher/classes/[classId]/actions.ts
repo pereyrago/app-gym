@@ -213,6 +213,12 @@ export async function updateClassStatusAction(
     cancellation_reason_observations:
       status === "success" ? null : (cancellation_reason_observations ?? null),
   });
+
+  if (status !== "success") {
+    await setClassAttendances(classId, []);
+    await clearClassAbsences(classId);
+  }
+
   revalidatePath(`/teacher/classes/${classId}`);
   revalidatePath("/teacher/classes");
   revalidatePath("/teacher");
