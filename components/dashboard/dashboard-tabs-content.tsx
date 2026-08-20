@@ -285,6 +285,19 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
       </div>
 
       <TabsContent value="ejecutivo" className="mt-0 space-y-5">
+        {/* 1. Insights del período (100% width) */}
+        <SectionCard title="Insights del período" description="Lectura rápida de métricas clave">
+          <BusinessInsights
+            kpis={kpis}
+            topTimeSlot={topTimeSlot}
+            topWeekday={topWeekday}
+            topClassType={topClassType}
+            topTeacherByAvg={topTeacherByAvg}
+            executiveSummaryKpis={props.executiveSummaryKpis}
+            teacherRanking={props.teacherRanking}
+          />
+        </SectionCard>
+
         {/* Fila: Evolución del negocio (Ancho completo) */}
         <SectionCard
           title="Evolución del negocio"
@@ -292,33 +305,6 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
         >
           <BusinessEvolutionChart data={props.businessEvolution} />
         </SectionCard>
-
-        {/* Fila: Cancelaciones por origen (50%) + Motivos de cancelación (50%) */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <SectionCard
-            title="Cancelaciones por origen"
-            description="Alumno / Profesor / Clima / Otros"
-            chartSummary={genericCountSummary(
-              props.cancellationsBySource,
-              "Sin cancelaciones registradas.",
-              "cancelaciones"
-            )}
-          >
-            <CancellationsBySourceDonut data={props.cancellationsBySource} />
-          </SectionCard>
-
-          <SectionCard
-            title="Motivos de cancelación (Top 5)"
-            description="Faltas registradas con motivo"
-            chartSummary={genericCountSummary(
-              props.cancellationReasons,
-              "Sin motivos de cancelación registrados.",
-              "faltas"
-            )}
-          >
-            <CancellationReasonsChart data={props.cancellationReasons} />
-          </SectionCard>
-        </div>
 
         {/* Fila: Ranking de profesores (50%) + Alumnos por profesor (50%) */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -358,18 +344,32 @@ export function DashboardTabsContent(props: DashboardTabsContentProps) {
           </SectionCard>
         </div>
 
-        {/* 1. Insights del período (100% width) */}
-        <SectionCard title="Insights del período" description="Lectura rápida de métricas clave">
-          <BusinessInsights
-            kpis={kpis}
-            topTimeSlot={topTimeSlot}
-            topWeekday={topWeekday}
-            topClassType={topClassType}
-            topTeacherByAvg={topTeacherByAvg}
-            executiveSummaryKpis={props.executiveSummaryKpis}
-            teacherRanking={props.teacherRanking}
-          />
-        </SectionCard>
+        {/* Fila: Cancelaciones por origen (50%) + Motivos de cancelación (50%) */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SectionCard
+            title="Cancelaciones por origen"
+            description="Alumno / Profesor / Clima / Otros"
+            chartSummary={genericCountSummary(
+              props.cancellationsBySource,
+              "Sin cancelaciones registradas.",
+              "cancelaciones"
+            )}
+          >
+            <CancellationsBySourceDonut data={props.cancellationsBySource} />
+          </SectionCard>
+
+          <SectionCard
+            title="Motivos de cancelación (Top 5)"
+            description="Faltas registradas con motivo"
+            chartSummary={genericCountSummary(
+              props.cancellationReasons,
+              "Sin motivos de cancelación registrados.",
+              "faltas"
+            )}
+          >
+            <CancellationReasonsChart data={props.cancellationReasons} />
+          </SectionCard>
+        </div>
 
         {/* 2. Profesores con más cancelaciones (100% width) */}
         <SectionCard
